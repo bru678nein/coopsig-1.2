@@ -1,0 +1,19 @@
+Esta carpeta debe contener "base_test.mdb": una COPIA de la base de datos
+real (nunca el archivo original — Constitución I), usada solo para correr
+las pruebas de integración de AsociadoRepositoryTests en la PC con Windows.
+
+Este repositorio no incluye el archivo .mdb porque:
+- No se puede crear un .mdb válido desde un entorno Mac (el formato Jet/ACE
+  es propietario y requiere el driver de Windows/Office).
+- La base original nunca debe copiarse a un repositorio de código fuente.
+
+Antes de ejecutar AsociadoRepositoryTests en Windows:
+1. Copie una base de prueba (no la de producción) a esta carpeta con el
+   nombre "base_test.mdb".
+2. Verifique que la copia tenga la tabla Asociados con al menos algunos
+   registros activos y alguno dado de baja, para ejercitar ambos casos.
+
+Si "base_test.mdb" no está presente, las pruebas de integración se marcan
+como inconclusas (Assert.Inconclusive) en lugar de fallar. Las pruebas de
+clasificación numérico/alfabético (EsBusquedaNumerica, Coincide) no
+dependen de este archivo y corren siempre.
