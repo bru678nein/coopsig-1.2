@@ -1,6 +1,6 @@
 using System;
-using System.Data;
 using System.Data.OleDb;
+using Microsoft.Win32;
 
 namespace CoopSig.Config
 {
@@ -64,25 +64,25 @@ namespace CoopSig.Config
         }
 
         /// <summary>
-        /// Consulta los proveedores OLE DB registrados en el equipo. Evita el
-        /// error engañoso "El proveedor no está registrado en el equipo local",
-        /// que en realidad es desajuste de arquitectura, no ausencia de driver.
+        /// Comprueba si el proveedor está registrado leyendo su ProgID en el
+        /// registro. Evita el error engañoso "El proveedor no está registrado en
+        /// el equipo local", que en realidad es desajuste de arquitectura, no
+        /// ausencia de driver: como el proceso es x64, esta consulta ve la vista
+        /// de 64 bits del registro y por lo tanto responde por la arquitectura
+        /// correcta.
+        ///
+        /// No se usa OleDbEnumerator.GetElements() a propósito: enumera TODOS los
+        /// proveedores OLE DB del equipo, y algunos (los de SQL Server) hacen
+        /// descubrimiento por red al ser enumerados. Esa llamada COM puede
+        /// bloquear el hilo de interfaz durante minutos y dispara el asistente de
+        /// depuración 'ContextSwitchDeadlock'.
         /// </summary>
         private static bool ProveedorRegistrado(string nombreProveedor)
         {
-            var enumerador = new OleDbEnumerator();
-            using (var tabla = enumerador.GetElements())
+            using (var clave = Registry.ClassesRoot.OpenSubKey(nombreProveedor))
             {
-                foreach (DataRow fila in tabla.Rows)
-                {
-                    var nombre = fila["SOURCES_NAME"] as string;
-                    if (string.Equals(nombre, nombreProveedor, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
+                return clave != null;
             }
-            return false;
         }
     }
 }
