@@ -19,8 +19,19 @@ namespace CoopSig.Forms
         private readonly AsociadoRepository _repositorio = new AsociadoRepository();
         private List<Asociado> _padron = new List<Asociado>();
 
+        /// <summary>Opción del filtro que representa "no filtrar por servicio".</summary>
+        private const string TodosLosServicios = "(Todos los servicios)";
+
         private TextBox _txtBuscar;
+        private ComboBox _cmbFiltroServicio;
         private CheckBox _chkIncluirBajas;
+
+        /// <summary>
+        /// Activo mientras se repuebla el filtro de servicios. Vaciar y volver a
+        /// llenar un ComboBox dispara SelectedIndexChanged varias veces, y sin
+        /// esta guarda cada recarga del padrón filtraría la grilla de más.
+        /// </summary>
+        private bool _poblandoFiltroServicio;
         private DataGridView _grilla;
         private Button _btnNuevo;
         private Button _btnEditar;
@@ -71,11 +82,35 @@ namespace CoopSig.Forms
             _txtBuscar.TextChanged += (s, e) => ReiniciarDebounce();
             _txtBuscar.KeyDown += TxtBuscar_KeyDown;
 
+            var lblServicio = new Label
+            {
+                Text = "Servicio:",
+                Location = new Point(345, 15),
+                AutoSize = true
+            };
+
+            // Filtro aparte del buscador de texto: se combinan, no compiten.
+            // Las opciones salen del padrón ya cargado en memoria, así que no
+            // hace falta otra consulta a la base.
+            _cmbFiltroServicio = new ComboBox
+            {
+                Location = new Point(345, 35),
+                Size = new Size(250, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            _cmbFiltroServicio.SelectedIndexChanged += (s, e) =>
+            {
+                if (!_poblandoFiltroServicio)
+                {
+                    AplicarFiltro();
+                }
+            };
+
             // HU-4: por defecto el listado muestra solo activos.
             _chkIncluirBajas = new CheckBox
             {
                 Text = "Incluir bajas",
-                Location = new Point(345, 38),
+                Location = new Point(610, 38),
                 AutoSize = true,
                 Checked = false
             };
@@ -137,6 +172,8 @@ namespace CoopSig.Forms
 
             Controls.Add(lblBuscar);
             Controls.Add(_txtBuscar);
+            Controls.Add(lblServicio);
+            Controls.Add(_cmbFiltroServicio);
             Controls.Add(_chkIncluirBajas);
             Controls.Add(_grilla);
             Controls.Add(_btnNuevo);
@@ -208,9 +245,12 @@ namespace CoopSig.Forms
         {
             var texto = _txtBuscar.Text;
             var incluirBajas = _chkIncluirBajas.Checked;
+            var servicio = ServicioSeleccionado();
 
             var filtrados = _padron
                 .Where(a => incluirBajas || a.Activo)
+                .Where(a => servicio == null
+                    || string.Equals(a.Servicio, servicio, StringComparison.OrdinalIgnoreCase))
                 .Where(a => AsociadoRepository.Coincide(a, texto))
                 .OrderBy(a => a.Apellido)
                 .ThenBy(a => a.Nombre)
@@ -342,7 +382,52 @@ namespace CoopSig.Forms
         private void RecargarYFiltrar()
         {
             CargarPadron();
+            ActualizarFiltroDeServicios();
             AplicarFiltro();
+        }
+
+        /// <summary>
+        /// Rearma las opciones del filtro a partir de los servicios presentes en
+        /// el padrón, conservando la selección actual si ese servicio sigue
+        /// existiendo. Se rearma en cada recarga porque editar un asociado puede
+        /// hacer aparecer o desaparecer un servicio de la lista.
+        /// </summary>
+        private void ActualizarFiltroDeServicios()
+        {
+            var seleccionPrevia = ServicioSeleccionado();
+
+            var servicios = _padron
+                .Select(a => a.Servicio)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase)
+                .Cast<object>()
+                .ToArray();
+
+            _poblandoFiltroServicio = true;
+            try
+            {
+                _cmbFiltroServicio.Items.Clear();
+                _cmbFiltroServicio.Items.Add(TodosLosServicios);
+                _cmbFiltroServicio.Items.AddRange(servicios);
+
+                var indice = seleccionPrevia == null
+                    ? 0
+                    : _cmbFiltroServicio.Items.IndexOf(seleccionPrevia);
+                _cmbFiltroServicio.SelectedIndex = indice >= 0 ? indice : 0;
+            }
+            finally
+            {
+                _poblandoFiltroServicio = false;
+            }
+        }
+
+        /// <summary>Servicio elegido, o null cuando está en "todos".</summary>
+        private string ServicioSeleccionado()
+        {
+            return _cmbFiltroServicio.SelectedIndex <= 0
+                ? null
+                : _cmbFiltroServicio.SelectedItem as string;
         }
 
         private static void MostrarError(string mensaje, Exception ex)
