@@ -70,7 +70,8 @@ namespace CoopSig.Config
         /// </summary>
         private static bool ProveedorRegistrado(string nombreProveedor)
         {
-            using (var tabla = OleDbEnumerator.GetElements())
+            var enumerador = new OleDbEnumerator();
+            using (var tabla = enumerador.GetElements())
             {
                 foreach (DataRow fila in tabla.Rows)
                 {
