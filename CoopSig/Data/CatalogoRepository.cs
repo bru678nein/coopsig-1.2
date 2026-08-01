@@ -39,12 +39,37 @@ namespace CoopSig.Data
         /// </summary>
         private static List<string> ObtenerValoresDistintosUnidos(string tablaCatalogo, string columnaAsociados)
         {
-            var sql =
-                "SELECT Nombre FROM " + tablaCatalogo +
-                " UNION SELECT " + columnaAsociados + " FROM Asociados" +
-                " WHERE " + columnaAsociados + " IS NOT NULL AND " + columnaAsociados + " <> ''" +
-                " ORDER BY 1";
+            try
+            {
+                return Consultar(
+                    "SELECT Nombre FROM " + tablaCatalogo +
+                    " UNION " + SelectValoresEnUso(columnaAsociados) +
+                    " ORDER BY 1");
+            }
+            catch (OleDbException)
+            {
+                // Esta base puede no tener la tabla de catálogo, o tenerla con
+                // otro nombre de columna. Los valores ya cargados en Asociados
+                // alcanzan por sí solos (Decisión de mapeo #3, plan.md): sin
+                // este repliegue las listas quedan vacías y, al ser
+                // DropDownList, el alta y la edición se vuelven imposibles.
+                // Si la falla fuese de conexión, esta segunda consulta también
+                // falla y el error se propaga igual.
+                return Consultar(SelectValoresEnUso(columnaAsociados) + " ORDER BY 1");
+            }
+        }
 
+        /// <summary>
+        /// Valores realmente en uso en el padrón, sin repetir y sin vacíos.
+        /// </summary>
+        private static string SelectValoresEnUso(string columnaAsociados)
+        {
+            return "SELECT DISTINCT " + columnaAsociados + " FROM Asociados" +
+                   " WHERE " + columnaAsociados + " IS NOT NULL AND " + columnaAsociados + " <> ''";
+        }
+
+        private static List<string> Consultar(string sql)
+        {
             var resultado = new List<string>();
             using (var conexion = ConexionManager.CrearConexion())
             using (var comando = new OleDbCommand(sql, conexion))
