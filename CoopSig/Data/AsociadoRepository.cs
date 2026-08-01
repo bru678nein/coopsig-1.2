@@ -19,7 +19,8 @@ namespace CoopSig.Data
         private const string Tabla = "Asociados";
 
         private const string Columnas =
-            "Documento, Apellido, Nombre, CUIL, Digito, Servicio, Cargo, FechaIngreso, FechaBaja";
+            "Documento, Apellido, Nombre, CUIL, Digito, FechaNacimiento, Sexo, EstadoCivil," +
+            " Direccion, Telefono, Notas, Servicio, Cargo, FechaIngreso, FechaBaja";
 
         /// <summary>
         /// Busca asociados por Documento (si el texto es enteramente numérico,
@@ -88,10 +89,13 @@ namespace CoopSig.Data
 
         public void Insertar(Asociado asociado)
         {
+            // OleDb liga los parámetros por POSICIÓN, no por nombre: el orden de
+            // los Add debe seguir exactamente el orden de las columnas.
             var sql =
                 "INSERT INTO " + Tabla +
-                " (Documento, Apellido, Nombre, CUIL, Digito, Servicio, Cargo, FechaIngreso, FechaBaja)" +
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                " (Documento, Apellido, Nombre, CUIL, Digito, FechaNacimiento, Sexo, EstadoCivil," +
+                " Direccion, Telefono, Notas, Servicio, Cargo, FechaIngreso, FechaBaja)" +
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
             using (var conexion = ConexionManager.CrearConexion())
             using (var comando = new OleDbCommand(sql, conexion))
@@ -101,6 +105,12 @@ namespace CoopSig.Data
                 comando.Parameters.AddWithValue("@nombre", asociado.Nombre);
                 AgregarParametroNullable(comando, "@cuil", asociado.Cuil);
                 AgregarParametroNullable(comando, "@digito", asociado.Digito);
+                AgregarParametroNullable(comando, "@fechaNacimiento", asociado.FechaNacimiento);
+                AgregarParametroNullable(comando, "@sexo", asociado.Sexo);
+                AgregarParametroNullable(comando, "@estadoCivil", asociado.EstadoCivil);
+                AgregarParametroNullable(comando, "@direccion", asociado.Direccion);
+                AgregarParametroNullable(comando, "@telefono", asociado.Telefono);
+                AgregarParametroTextoLargo(comando, "@notas", asociado.Notas);
                 comando.Parameters.AddWithValue("@servicio", asociado.Servicio);
                 AgregarParametroNullable(comando, "@cargo", asociado.Cargo);
                 AgregarParametroNullable(comando, "@fechaIngreso", asociado.FechaIngreso);
@@ -113,10 +123,12 @@ namespace CoopSig.Data
 
         public void Actualizar(Asociado asociado)
         {
+            // El parámetro del WHERE va último: OleDb liga por posición.
             var sql =
                 "UPDATE " + Tabla +
-                " SET Apellido = ?, Nombre = ?, CUIL = ?, Digito = ?, Servicio = ?, Cargo = ?," +
-                " FechaIngreso = ?, FechaBaja = ? WHERE Documento = ?";
+                " SET Apellido = ?, Nombre = ?, CUIL = ?, Digito = ?, FechaNacimiento = ?," +
+                " Sexo = ?, EstadoCivil = ?, Direccion = ?, Telefono = ?, Notas = ?," +
+                " Servicio = ?, Cargo = ?, FechaIngreso = ?, FechaBaja = ? WHERE Documento = ?";
 
             using (var conexion = ConexionManager.CrearConexion())
             using (var comando = new OleDbCommand(sql, conexion))
@@ -125,6 +137,12 @@ namespace CoopSig.Data
                 comando.Parameters.AddWithValue("@nombre", asociado.Nombre);
                 AgregarParametroNullable(comando, "@cuil", asociado.Cuil);
                 AgregarParametroNullable(comando, "@digito", asociado.Digito);
+                AgregarParametroNullable(comando, "@fechaNacimiento", asociado.FechaNacimiento);
+                AgregarParametroNullable(comando, "@sexo", asociado.Sexo);
+                AgregarParametroNullable(comando, "@estadoCivil", asociado.EstadoCivil);
+                AgregarParametroNullable(comando, "@direccion", asociado.Direccion);
+                AgregarParametroNullable(comando, "@telefono", asociado.Telefono);
+                AgregarParametroTextoLargo(comando, "@notas", asociado.Notas);
                 comando.Parameters.AddWithValue("@servicio", asociado.Servicio);
                 AgregarParametroNullable(comando, "@cargo", asociado.Cargo);
                 AgregarParametroNullable(comando, "@fechaIngreso", asociado.FechaIngreso);
@@ -234,6 +252,17 @@ namespace CoopSig.Data
             comando.Parameters.AddWithValue(nombre, valor ?? DBNull.Value);
         }
 
+        /// <summary>
+        /// Parámetro para una columna "Texto largo" (Memo). Se declara el tipo a
+        /// mano en lugar de usar AddWithValue: al inferirlo, ADO.NET lo trata
+        /// como texto corto y recorta el contenido a 255 caracteres.
+        /// </summary>
+        private static void AgregarParametroTextoLargo(OleDbCommand comando, string nombre, string valor)
+        {
+            var parametro = comando.Parameters.Add(nombre, OleDbType.LongVarWChar);
+            parametro.Value = string.IsNullOrEmpty(valor) ? (object)DBNull.Value : valor;
+        }
+
         private static Asociado MapearAsociado(IDataRecord lector)
         {
             return new Asociado
@@ -243,6 +272,12 @@ namespace CoopSig.Data
                 Nombre = lector["Nombre"] as string,
                 Cuil = LeerEnteroNullable(lector["CUIL"]),
                 Digito = LeerEnteroNullable(lector["Digito"]),
+                FechaNacimiento = LeerFechaNullable(lector["FechaNacimiento"]),
+                Sexo = lector["Sexo"] as string,
+                EstadoCivil = lector["EstadoCivil"] as string,
+                Direccion = lector["Direccion"] as string,
+                Telefono = lector["Telefono"] as string,
+                Notas = lector["Notas"] as string,
                 Servicio = lector["Servicio"] as string,
                 Cargo = lector["Cargo"] as string,
                 FechaIngreso = LeerFechaNullable(lector["FechaIngreso"]),

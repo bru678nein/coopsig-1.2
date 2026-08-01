@@ -21,14 +21,32 @@ namespace CoopSig.Forms
         private readonly long? _documentoOriginal;
         private Asociado _asociadoActual;
 
+        private const int MargenIzquierdo = 15;
+        private const int AnchoEtiqueta = 130;
+        private const int IzquierdaCampo = MargenIzquierdo + AnchoEtiqueta + 5;
+        private const int AnchoCampo = 270;
+        private const int AnchoCampoCorto = 150;
+        private const int SaltoFila = 32;
+
+        /// <summary>
+        /// Cursor vertical del armado de la pantalla. Cada campo se agrega bajo
+        /// el anterior y lo adelanta, en lugar de repartir coordenadas fijas
+        /// que hay que recalcular a mano cada vez que se suma un campo.
+        /// </summary>
+        private int _filaY;
+
         private TextBox _txtApellido;
         private TextBox _txtNombre;
         private TextBox _txtDocumento;
+        private DateTimePicker _dtpFechaNacimiento;
+        private ComboBox _cmbSexo;
+        private ComboBox _cmbEstadoCivil;
+        private TextBox _txtDireccion;
+        private TextBox _txtTelefono;
         private ComboBox _cmbServicio;
         private ComboBox _cmbCargo;
-        private TextBox _txtCuil;
-        private TextBox _txtDigito;
         private DateTimePicker _dtpFechaIngreso;
+        private TextBox _txtNotas;
         private Label _lblEstado;
         private Button _btnGuardar;
         private Button _btnBaja;
@@ -57,6 +75,7 @@ namespace CoopSig.Forms
             else
             {
                 _asociadoActual = new Asociado { FechaIngreso = DateTime.Today };
+                _dtpFechaIngreso.Checked = true;
                 ActualizarEstadoVisual();
             }
 
@@ -67,57 +86,65 @@ namespace CoopSig.Forms
         {
             Text = _documentoOriginal.HasValue ? "Editar asociado" : "Nuevo asociado";
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(420, 500);
+            ClientSize = new Size(450, 577);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MinimizeBox = false;
             MaximizeBox = false;
             KeyPreview = true;
             Font = new Font("Segoe UI", 9.5F);
 
-            Controls.Add(NuevaEtiqueta("Apellido *", 15));
-            _txtApellido = NuevoTextBox(35, 370);
+            _filaY = 15;
 
-            Controls.Add(NuevaEtiqueta("Nombre *", 75));
-            _txtNombre = NuevoTextBox(95, 370);
+            _txtApellido = AgregarTextBox("Apellido *");
+            _txtNombre = AgregarTextBox("Nombre *");
 
-            Controls.Add(NuevaEtiqueta("Documento *", 135));
-            _txtDocumento = NuevoTextBox(155, 370);
-            _txtDocumento.MaxLength = 9;
+            // Un solo campo acepta las dos formas de identificar a la persona:
+            // el CUIT se parte en prefijo, documento y verificador al guardar
+            // (Validaciones.ParsearDocumentoOCuit). El documento sigue siendo la
+            // clave, así que cargar el CUIT no genera un registro duplicado.
+            _txtDocumento = AgregarTextBox("CUIT o DNI *");
+            _txtDocumento.MaxLength = 13;
 
-            Controls.Add(NuevaEtiqueta("Servicio *", 195));
-            _cmbServicio = NuevoComboBox(215, 370);
-
-            Controls.Add(NuevaEtiqueta("Cargo", 255));
-            _cmbCargo = NuevoComboBox(275, 370);
-
-            Controls.Add(NuevaEtiqueta("Identificador fiscal (opcional): prefijo / dígito", 315));
-            _txtCuil = new TextBox { Location = new Point(15, 335), Size = new Size(80, 25), MaxLength = 2 };
-            _txtDigito = new TextBox { Location = new Point(105, 335), Size = new Size(60, 25), MaxLength = 1 };
-            Controls.Add(_txtCuil);
-            Controls.Add(_txtDigito);
-            RegistrarAvanceConEnter(_txtCuil);
-            RegistrarAvanceConEnter(_txtDigito);
-
-            Controls.Add(NuevaEtiqueta("Fecha de ingreso", 375));
-            _dtpFechaIngreso = new DateTimePicker
-            {
-                Location = new Point(15, 395),
-                Size = new Size(200, 25),
-                Format = DateTimePickerFormat.Short,
-                Value = DateTime.Today
-            };
-            Controls.Add(_dtpFechaIngreso);
-            RegistrarAvanceConEnter(_dtpFechaIngreso);
+            _dtpFechaNacimiento = AgregarSelectorDeFecha("Fecha de nacimiento");
+            _cmbSexo = AgregarComboBox("Sexo", ComboBoxStyle.DropDown);
+            _cmbEstadoCivil = AgregarComboBox("Estado civil", ComboBoxStyle.DropDown);
+            _txtDireccion = AgregarTextBox("Dirección");
+            _txtTelefono = AgregarTextBox("Teléfono");
+            _cmbServicio = AgregarComboBox("Servicio *", ComboBoxStyle.DropDownList);
+            _cmbCargo = AgregarComboBox("Cargo", ComboBoxStyle.DropDownList);
+            _dtpFechaIngreso = AgregarSelectorDeFecha("Fecha de ingreso");
 
             _lblEstado = new Label
             {
-                Location = new Point(230, 398),
+                Location = new Point(IzquierdaCampo, _filaY + 4),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
             };
             Controls.Add(_lblEstado);
+            _filaY += SaltoFila;
 
-            const int yBotones = 445;
+            Controls.Add(new Label
+            {
+                Text = "Notas",
+                Location = new Point(MargenIzquierdo, _filaY),
+                AutoSize = true
+            });
+            _filaY += 20;
+
+            // Sin RegistrarAvanceConEnter a propósito: en un campo de varias
+            // líneas Enter tiene que insertar un salto, no saltar de control.
+            _txtNotas = new TextBox
+            {
+                Location = new Point(MargenIzquierdo, _filaY),
+                Size = new Size(AnchoEtiqueta + 5 + AnchoCampo, 90),
+                Multiline = true,
+                ScrollBars = ScrollBars.Vertical,
+                AcceptsReturn = true
+            };
+            Controls.Add(_txtNotas);
+            _filaY += 100;
+
+            var yBotones = _filaY + 10;
 
             _btnGuardar = new Button
             {
@@ -155,30 +182,73 @@ namespace CoopSig.Forms
             CancelButton = _btnCancelar;
         }
 
-        private static Label NuevaEtiqueta(string texto, int y)
+        /// <summary>Etiqueta a la izquierda del campo, en la misma fila.</summary>
+        private void AgregarEtiquetaDeFila(string texto)
         {
-            return new Label { Text = texto, Location = new Point(15, y), AutoSize = true };
+            Controls.Add(new Label
+            {
+                Text = texto,
+                Location = new Point(MargenIzquierdo, _filaY + 4),
+                Size = new Size(AnchoEtiqueta, 20)
+            });
         }
 
-        private TextBox NuevoTextBox(int y, int ancho)
+        private TextBox AgregarTextBox(string etiqueta)
         {
-            var caja = new TextBox { Location = new Point(15, y), Size = new Size(ancho, 25) };
+            AgregarEtiquetaDeFila(etiqueta);
+            var caja = new TextBox
+            {
+                Location = new Point(IzquierdaCampo, _filaY),
+                Size = new Size(AnchoCampo, 25)
+            };
             Controls.Add(caja);
             RegistrarAvanceConEnter(caja);
+            _filaY += SaltoFila;
             return caja;
         }
 
-        private ComboBox NuevoComboBox(int y, int ancho)
+        private ComboBox AgregarComboBox(string etiqueta, ComboBoxStyle estilo)
         {
+            AgregarEtiquetaDeFila(etiqueta);
             var combo = new ComboBox
             {
-                Location = new Point(15, y),
-                Size = new Size(ancho, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                Location = new Point(IzquierdaCampo, _filaY),
+                Size = new Size(AnchoCampo, 25),
+                DropDownStyle = estilo
             };
             Controls.Add(combo);
             RegistrarAvanceConEnter(combo);
+            _filaY += SaltoFila;
             return combo;
+        }
+
+        /// <summary>
+        /// Selector de fecha opcional. ShowCheckBox permite dejarlo sin marcar,
+        /// que es como se representa "no hay dato": sin eso el control siempre
+        /// devuelve una fecha y terminaría inventando una que nadie cargó.
+        /// </summary>
+        private DateTimePicker AgregarSelectorDeFecha(string etiqueta)
+        {
+            AgregarEtiquetaDeFila(etiqueta);
+            var selector = new DateTimePicker
+            {
+                Location = new Point(IzquierdaCampo, _filaY),
+                Size = new Size(AnchoCampoCorto, 25),
+                Format = DateTimePickerFormat.Short,
+                ShowCheckBox = true,
+                Checked = false,
+                Value = DateTime.Today
+            };
+            Controls.Add(selector);
+            RegistrarAvanceConEnter(selector);
+            _filaY += SaltoFila;
+            return selector;
+        }
+
+        private static string TextoONull(string valor)
+        {
+            var limpio = (valor ?? string.Empty).Trim();
+            return limpio.Length == 0 ? null : limpio;
         }
 
         /// <summary>HU-5: Enter avanza al campo siguiente en el orden visual.</summary>
@@ -221,6 +291,19 @@ namespace CoopSig.Forms
                 _cmbCargo.Items.Add(string.Empty);
                 _cmbCargo.Items.AddRange(cargos);
                 _cmbCargo.SelectedIndex = 0;
+
+                // Sexo y estado civil se dejan editables (DropDown) porque no
+                // tienen tabla de catálogo: la lista sale de los datos y podría
+                // venir vacía, y una lista cerrada y vacía no deja cargar nada.
+                var sexos = catalogo.ObtenerSexos().ToArray();
+                _cmbSexo.Items.Clear();
+                _cmbSexo.Items.AddRange(sexos);
+                _cmbSexo.Text = string.Empty;
+
+                var estadosCiviles = catalogo.ObtenerEstadosCiviles().ToArray();
+                _cmbEstadoCivil.Items.Clear();
+                _cmbEstadoCivil.Items.AddRange(estadosCiviles);
+                _cmbEstadoCivil.Text = string.Empty;
             }
             catch (Exception ex)
             {
@@ -245,9 +328,25 @@ namespace CoopSig.Forms
 
                 _txtApellido.Text = _asociadoActual.Apellido;
                 _txtNombre.Text = _asociadoActual.Nombre;
-                _txtDocumento.Text = _asociadoActual.Documento.ToString();
+
+                // Se muestra el CUIT completo cuando está cargado; si solo hay
+                // documento, se muestra el documento. El campo es de solo
+                // lectura: cambiarlo sería cambiar la clave del registro.
+                _txtDocumento.Text = _asociadoActual.Cuit ?? _asociadoActual.Documento.ToString();
                 _txtDocumento.ReadOnly = true;
                 _txtDocumento.TabStop = false;
+
+                _cmbSexo.Text = _asociadoActual.Sexo ?? string.Empty;
+                _cmbEstadoCivil.Text = _asociadoActual.EstadoCivil ?? string.Empty;
+                _txtDireccion.Text = _asociadoActual.Direccion;
+                _txtTelefono.Text = _asociadoActual.Telefono;
+                _txtNotas.Text = _asociadoActual.Notas;
+
+                if (_asociadoActual.FechaNacimiento.HasValue)
+                {
+                    _dtpFechaNacimiento.Value = _asociadoActual.FechaNacimiento.Value;
+                    _dtpFechaNacimiento.Checked = true;
+                }
 
                 if (!string.IsNullOrEmpty(_asociadoActual.Servicio) && !_cmbServicio.Items.Contains(_asociadoActual.Servicio))
                 {
@@ -261,12 +360,10 @@ namespace CoopSig.Forms
                 }
                 _cmbCargo.SelectedItem = string.IsNullOrEmpty(_asociadoActual.Cargo) ? string.Empty : _asociadoActual.Cargo;
 
-                _txtCuil.Text = _asociadoActual.Cuil.HasValue ? _asociadoActual.Cuil.Value.ToString("00") : string.Empty;
-                _txtDigito.Text = _asociadoActual.Digito.HasValue ? _asociadoActual.Digito.Value.ToString() : string.Empty;
-
                 if (_asociadoActual.FechaIngreso.HasValue)
                 {
                     _dtpFechaIngreso.Value = _asociadoActual.FechaIngreso.Value;
+                    _dtpFechaIngreso.Checked = true;
                 }
 
                 ActualizarEstadoVisual();
@@ -330,7 +427,13 @@ namespace CoopSig.Forms
                     Cargo = string.IsNullOrEmpty(cargoSeleccionado) ? null : cargoSeleccionado,
                     Cuil = cuil,
                     Digito = digito,
-                    FechaIngreso = _dtpFechaIngreso.Value.Date,
+                    FechaNacimiento = FechaSeleccionada(_dtpFechaNacimiento),
+                    Sexo = TextoONull(_cmbSexo.Text),
+                    EstadoCivil = TextoONull(_cmbEstadoCivil.Text),
+                    Direccion = TextoONull(_txtDireccion.Text),
+                    Telefono = TextoONull(_txtTelefono.Text),
+                    Notas = TextoONull(_txtNotas.Text),
+                    FechaIngreso = FechaSeleccionada(_dtpFechaIngreso),
                     FechaBaja = esNuevo ? null : _asociadoActual.FechaBaja
                 };
 
@@ -366,36 +469,30 @@ namespace CoopSig.Forms
             {
                 return "El nombre es obligatorio.";
             }
-            if (!long.TryParse(_txtDocumento.Text.Trim(), out documento) || documento <= 0)
+
+            var resultadoDocumento = Validaciones.ParsearDocumentoOCuit(
+                _txtDocumento.Text, out documento, out cuil, out digito);
+            if (!resultadoDocumento.EsValido)
             {
-                return "El documento debe ser un número válido.";
+                return resultadoDocumento.Mensaje;
             }
+
             if (_cmbServicio.SelectedItem == null)
             {
                 return "Debe seleccionar un servicio de la lista.";
             }
 
-            var textoCuil = _txtCuil.Text.Trim();
-            var textoDigito = _txtDigito.Text.Trim();
-
-            if (textoCuil.Length > 0)
+            if (_documentoOriginal.HasValue && _asociadoActual != null)
             {
-                int valorCuil;
-                if (!int.TryParse(textoCuil, out valorCuil))
-                {
-                    return "El prefijo del identificador fiscal debe ser numérico.";
-                }
-                cuil = valorCuil;
-            }
-
-            if (textoDigito.Length > 0)
-            {
-                int valorDigito;
-                if (!int.TryParse(textoDigito, out valorDigito))
-                {
-                    return "El dígito verificador del identificador fiscal debe ser numérico.";
-                }
-                digito = valorDigito;
+                // En edición el campo es de solo lectura, así que se conserva lo
+                // que ya estaba guardado en vez de reinterpretar el texto. Y no
+                // se revalida: un identificador histórico que no pase el módulo
+                // 11 dejaría la ficha imposible de guardar por un motivo que no
+                // tiene nada que ver con lo que el usuario vino a cambiar.
+                documento = _asociadoActual.Documento;
+                cuil = _asociadoActual.Cuil;
+                digito = _asociadoActual.Digito;
+                return null;
             }
 
             var resultadoCuil = Validaciones.ValidarCuil(documento, cuil, digito);
@@ -405,6 +502,12 @@ namespace CoopSig.Forms
             }
 
             return null;
+        }
+
+        /// <summary>Fecha del selector, o null si está sin marcar.</summary>
+        private static DateTime? FechaSeleccionada(DateTimePicker selector)
+        {
+            return selector.Checked ? (DateTime?)selector.Value.Date : null;
         }
 
         private void AlternarBaja()

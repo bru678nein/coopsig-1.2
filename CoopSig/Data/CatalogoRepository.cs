@@ -33,6 +33,28 @@ namespace CoopSig.Data
         }
 
         /// <summary>
+        /// Estados civiles realmente cargados en el padrón. Este campo no tiene
+        /// tabla de catálogo, así que la lista sale de los propios datos en vez
+        /// de una lista fija escrita a mano: si mañana aparece "Divorciado" o
+        /// "Separado", figura sin tocar el programa.
+        /// </summary>
+        public List<string> ObtenerEstadosCiviles()
+        {
+            return Consultar(SelectValoresEnUso("EstadoCivil") + " ORDER BY 1");
+        }
+
+        /// <summary>
+        /// Sexos realmente cargados en el padrón. Igual que EstadoCivil: sin
+        /// tabla de catálogo, la lista sale de los datos. Así se respeta la
+        /// convención que ya use la base ("M"/"F", "MASCULINO"/"FEMENINO" o la
+        /// que sea) en vez de imponerle una nueva desde el programa.
+        /// </summary>
+        public List<string> ObtenerSexos()
+        {
+            return Consultar(SelectValoresEnUso("Sexo") + " ORDER BY 1");
+        }
+
+        /// <summary>
         /// Une los nombres de la tabla de catálogo con los valores distintos
         /// ya usados en Asociados, para que ningún valor histórico desaparezca
         /// del listado aunque no esté dado de alta en el catálogo.

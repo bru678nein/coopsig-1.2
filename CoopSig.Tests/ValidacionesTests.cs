@@ -48,6 +48,95 @@ namespace CoopSig.Tests
         }
 
         [TestMethod]
+        public void ParsearDocumentoOCuit_CuitConGuiones_SeParteEnTresPartes()
+        {
+            long documento;
+            int? cuil;
+            int? digito;
+
+            var resultado = Validaciones.ParsearDocumentoOCuit(
+                "20-30123456-3", out documento, out cuil, out digito);
+
+            Assert.IsTrue(resultado.EsValido);
+            Assert.AreEqual(30123456L, documento);
+            Assert.AreEqual(20, cuil);
+            Assert.AreEqual(3, digito);
+        }
+
+        [TestMethod]
+        public void ParsearDocumentoOCuit_CuitSinSeparadores_SeParteIgual()
+        {
+            long documento;
+            int? cuil;
+            int? digito;
+
+            var resultado = Validaciones.ParsearDocumentoOCuit(
+                "20301234563", out documento, out cuil, out digito);
+
+            Assert.IsTrue(resultado.EsValido);
+            Assert.AreEqual(30123456L, documento);
+            Assert.AreEqual(20, cuil);
+            Assert.AreEqual(3, digito);
+        }
+
+        [TestMethod]
+        public void ParsearDocumentoOCuit_SoloDni_DejaIdentificadorFiscalVacio()
+        {
+            long documento;
+            int? cuil;
+            int? digito;
+
+            var resultado = Validaciones.ParsearDocumentoOCuit(
+                "30123456", out documento, out cuil, out digito);
+
+            Assert.IsTrue(resultado.EsValido);
+            Assert.AreEqual(30123456L, documento);
+            Assert.IsFalse(cuil.HasValue);
+            Assert.IsFalse(digito.HasValue);
+        }
+
+        [TestMethod]
+        public void ParsearDocumentoOCuit_CuitYDniDeLaMismaPersona_DanElMismoDocumento()
+        {
+            // La clave del registro no cambia según cómo se escriba el campo:
+            // cargar el CUIT de alguien ya existente no crea un duplicado.
+            long porCuit, porDni;
+            int? cuil, digito;
+
+            Validaciones.ParsearDocumentoOCuit("20-30123456-3", out porCuit, out cuil, out digito);
+            Validaciones.ParsearDocumentoOCuit("30123456", out porDni, out cuil, out digito);
+
+            Assert.AreEqual(porCuit, porDni);
+        }
+
+        [TestMethod]
+        public void ParsearDocumentoOCuit_CantidadDeDigitosInvalida_NoEsValido()
+        {
+            long documento;
+            int? cuil;
+            int? digito;
+
+            // Diez dígitos: ni CUIT (11) ni documento (hasta 8).
+            var resultado = Validaciones.ParsearDocumentoOCuit(
+                "2030123456", out documento, out cuil, out digito);
+
+            Assert.IsFalse(resultado.EsValido);
+        }
+
+        [TestMethod]
+        public void ParsearDocumentoOCuit_Vacio_NoEsValido()
+        {
+            long documento;
+            int? cuil;
+            int? digito;
+
+            var resultado = Validaciones.ParsearDocumentoOCuit(
+                "   ", out documento, out cuil, out digito);
+
+            Assert.IsFalse(resultado.EsValido);
+        }
+
+        [TestMethod]
         public void EsCampoObligatorioCompleto_Vacio_EsFalso()
         {
             Assert.IsFalse(Validaciones.EsCampoObligatorioCompleto(""));

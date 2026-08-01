@@ -18,6 +18,15 @@ namespace CoopSig.Models
         /// <summary>Dígito verificador del identificador fiscal. Opcional.</summary>
         public int? Digito { get; set; }
 
+        public DateTime? FechaNacimiento { get; set; }
+        public string Sexo { get; set; }
+        public string EstadoCivil { get; set; }
+        public string Direccion { get; set; }
+        public string Telefono { get; set; }
+
+        /// <summary>Texto libre. Columna Notas (Texto largo) de la tabla.</summary>
+        public string Notas { get; set; }
+
         public string Servicio { get; set; }
         public string Cargo { get; set; }
         public DateTime? FechaIngreso { get; set; }
@@ -30,11 +39,11 @@ namespace CoopSig.Models
         }
 
         /// <summary>
-        /// Identificador fiscal completo reconstruido: Cuil + Documento + Digito.
-        /// Devuelve null si falta el prefijo o el dígito — caso válido: solo se
-        /// dispone del documento (Decisión de mapeo #2, plan.md).
+        /// CUIT completo reconstruido: Cuil + Documento + Digito. Devuelve null
+        /// si falta el prefijo o el dígito — caso válido: solo se dispone del
+        /// documento (Decisión de mapeo #2, plan.md).
         /// </summary>
-        public string IdentificadorFiscal
+        public string Cuit
         {
             get
             {

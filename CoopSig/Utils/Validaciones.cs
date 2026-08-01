@@ -1,3 +1,4 @@
+using System.Text;
 using CoopSig.Data;
 using CoopSig.Models;
 
@@ -83,6 +84,71 @@ namespace CoopSig.Utils
         public static bool EsCampoObligatorioCompleto(string valor)
         {
             return !string.IsNullOrWhiteSpace(valor);
+        }
+
+        /// <summary>
+        /// Interpreta un mismo campo escrito como CUIT o como DNI. Se ignoran
+        /// guiones, puntos y espacios, así que "20-12345678-3", "20123456783"
+        /// y "12345678" son todas entradas válidas.
+        ///
+        /// Con 11 dígitos se parte en prefijo (2) + documento (8) + verificador
+        /// (1). Con 8 o menos se toma como documento solo, que es un caso
+        /// legítimo: hay asociados de los que únicamente se tiene el DNI.
+        ///
+        /// El documento sigue siendo la clave del registro en ambos casos, así
+        /// que cargar el CUIT de alguien ya existente no crea un duplicado.
+        /// </summary>
+        public static ResultadoValidacion ParsearDocumentoOCuit(
+            string texto, out long documento, out int? cuil, out int? digito)
+        {
+            documento = 0;
+            cuil = null;
+            digito = null;
+
+            var soloDigitos = SoloDigitos(texto);
+            if (soloDigitos.Length == 0)
+            {
+                return ResultadoValidacion.Error("Ingrese el CUIT o el DNI del asociado.");
+            }
+
+            if (soloDigitos.Length == 11)
+            {
+                cuil = int.Parse(soloDigitos.Substring(0, 2));
+                documento = long.Parse(soloDigitos.Substring(2, 8));
+                digito = int.Parse(soloDigitos.Substring(10, 1));
+                return ResultadoValidacion.Ok();
+            }
+
+            if (soloDigitos.Length <= 8)
+            {
+                documento = long.Parse(soloDigitos);
+                if (documento <= 0)
+                {
+                    return ResultadoValidacion.Error("El documento debe ser mayor que cero.");
+                }
+                return ResultadoValidacion.Ok();
+            }
+
+            return ResultadoValidacion.Error(
+                "El valor ingresado no es un CUIT (11 dígitos) ni un DNI (hasta 8 dígitos).");
+        }
+
+        private static string SoloDigitos(string texto)
+        {
+            if (string.IsNullOrEmpty(texto))
+            {
+                return string.Empty;
+            }
+
+            var limpio = new StringBuilder(texto.Length);
+            foreach (var caracter in texto)
+            {
+                if (char.IsDigit(caracter))
+                {
+                    limpio.Append(caracter);
+                }
+            }
+            return limpio.ToString();
         }
     }
 
