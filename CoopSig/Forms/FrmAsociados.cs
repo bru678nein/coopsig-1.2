@@ -27,6 +27,14 @@ namespace CoopSig.Forms
         private Button _btnBaja;
         private Timer _timerDebounce;
 
+        /// <summary>
+        /// Activo mientras se puebla la grilla. DataGridView.Rows.Add dispara
+        /// SelectionChanged apenas existe la primera fila, es decir ANTES de que
+        /// se le asigne el Tag con el asociado. Sin esta guarda el manejador lee
+        /// un Tag todavía nulo y la carga muere en la primera fila.
+        /// </summary>
+        private bool _poblandoGrilla;
+
         public FrmAsociados()
         {
             InicializarComponentes();
@@ -208,16 +216,24 @@ namespace CoopSig.Forms
                 .ThenBy(a => a.Nombre)
                 .ToList();
 
-            _grilla.Rows.Clear();
-            foreach (var asociado in filtrados)
+            _poblandoGrilla = true;
+            try
             {
-                var indice = _grilla.Rows.Add(
-                    asociado.Apellido,
-                    asociado.Nombre,
-                    asociado.Documento,
-                    asociado.Servicio,
-                    asociado.Activo ? "Activo" : "Baja");
-                _grilla.Rows[indice].Tag = asociado;
+                _grilla.Rows.Clear();
+                foreach (var asociado in filtrados)
+                {
+                    var indice = _grilla.Rows.Add(
+                        asociado.Apellido,
+                        asociado.Nombre,
+                        asociado.Documento,
+                        asociado.Servicio,
+                        asociado.Activo ? "Activo" : "Baja");
+                    _grilla.Rows[indice].Tag = asociado;
+                }
+            }
+            finally
+            {
+                _poblandoGrilla = false;
             }
 
             ActualizarBotones();
@@ -225,12 +241,18 @@ namespace CoopSig.Forms
 
         private void ActualizarBotones()
         {
-            var haySeleccion = _grilla.CurrentRow != null;
-            _btnEditar.Enabled = haySeleccion;
-
-            if (haySeleccion)
+            // Durante la carga la selección cambia una vez por fila y los Tag
+            // aún no están asignados: se actualiza una sola vez al terminar.
+            if (_poblandoGrilla)
             {
-                var asociado = (Asociado)_grilla.CurrentRow.Tag;
+                return;
+            }
+
+            var asociado = ObtenerSeleccionado();
+            _btnEditar.Enabled = asociado != null;
+
+            if (asociado != null)
+            {
                 _btnBaja.Text = asociado.Activo ? "&Baja" : "&Reactivar";
                 _btnBaja.Enabled = true;
             }
@@ -239,6 +261,16 @@ namespace CoopSig.Forms
                 _btnBaja.Text = "&Baja";
                 _btnBaja.Enabled = false;
             }
+        }
+
+        /// <summary>
+        /// Asociado de la fila seleccionada, o null si no hay selección o la
+        /// fila todavía no tiene su Tag asignado.
+        /// </summary>
+        private Asociado ObtenerSeleccionado()
+        {
+            var fila = _grilla.CurrentRow;
+            return fila == null ? null : fila.Tag as Asociado;
         }
 
         private void AbrirFichaNueva()
@@ -254,12 +286,12 @@ namespace CoopSig.Forms
 
         private void AbrirFichaSeleccionada()
         {
-            if (_grilla.CurrentRow == null)
+            var asociado = ObtenerSeleccionado();
+            if (asociado == null)
             {
                 return;
             }
 
-            var asociado = (Asociado)_grilla.CurrentRow.Tag;
             using (var ficha = new FrmAsociadoDetalle(asociado.Documento))
             {
                 if (ficha.ShowDialog(this) == DialogResult.OK)
@@ -271,12 +303,11 @@ namespace CoopSig.Forms
 
         private void AlternarBajaSeleccionado()
         {
-            if (_grilla.CurrentRow == null)
+            var asociado = ObtenerSeleccionado();
+            if (asociado == null)
             {
                 return;
             }
-
-            var asociado = (Asociado)_grilla.CurrentRow.Tag;
 
             try
             {
