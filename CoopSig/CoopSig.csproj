@@ -50,6 +50,7 @@
     <Compile Include="Config\AppSettings.cs" />
     <Compile Include="Config\ConexionManager.cs" />
     <Compile Include="Data\AsociadoRepository.cs" />
+    <Compile Include="Data\BonoRepository.cs" />
     <Compile Include="Data\CatalogoRepository.cs" />
     <Compile Include="Forms\FrmAsociadoDetalle.cs" />
     <Compile Include="Forms\FrmAsociados.cs" />
