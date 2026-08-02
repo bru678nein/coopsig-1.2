@@ -54,6 +54,8 @@
     <Compile Include="Data\CatalogoRepository.cs" />
     <Compile Include="Forms\FrmAsociadoDetalle.cs" />
     <Compile Include="Forms\FrmAsociados.cs" />
+    <Compile Include="Forms\FrmBonoDetalle.cs" />
+    <Compile Include="Forms\FrmBonos.cs" />
     <Compile Include="Forms\FrmPrincipal.cs" />
     <Compile Include="Models\Asociado.cs" />
     <Compile Include="Models\Bono.cs" />

@@ -48,12 +48,12 @@ namespace CoopSig.Forms
 
             var btnBonos = new Button
             {
-                Text = "Bonos (próximamente)",
+                Text = "&Bonos",
                 Location = new Point(20, 140),
                 Size = new Size(380, 50),
-                Font = new Font("Segoe UI", 12F),
-                Enabled = false
+                Font = new Font("Segoe UI", 12F)
             };
+            btnBonos.Click += (s, e) => AbrirBonos();
 
             var btnAnticipos = new Button
             {
@@ -102,6 +102,14 @@ namespace CoopSig.Forms
         private void AbrirAsociados()
         {
             using (var pantalla = new FrmAsociados())
+            {
+                pantalla.ShowDialog(this);
+            }
+        }
+
+        private void AbrirBonos()
+        {
+            using (var pantalla = new FrmBonos())
             {
                 pantalla.ShowDialog(this);
             }
