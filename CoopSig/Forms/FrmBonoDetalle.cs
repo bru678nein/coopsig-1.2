@@ -11,8 +11,8 @@ namespace CoopSig.Forms
 {
     /// <summary>
     /// Carga y edición de un bono. Replica el flujo del sistema anterior: se
-    /// trabaja de a un bono por vez, con los datos de la persona arriba y los
-    /// importes abajo.
+    /// trabaja de a un bono por vez, con los datos de la persona arriba,
+    /// haberes a la izquierda y descuentos a la derecha.
     ///
     /// Los totales se recalculan mientras se tipea. El 2% de Ley 20337 se
     /// muestra pero no se carga: es calculado y no existe como columna.
@@ -24,12 +24,25 @@ namespace CoopSig.Forms
         private readonly int? _idBono;
         private Bono _bonoActual;
 
-        private const int MargenIzquierdo = 15;
-        private const int AnchoEtiqueta = 130;
-        private const int IzquierdaCampo = MargenIzquierdo + AnchoEtiqueta + 5;
-        private const int AnchoCampo = 200;
+        // El formulario se arma en dos columnas. Los totales y los botones van
+        // abajo, cruzando las dos. Las alturas se calculan a partir del punto
+        // más bajo que alcanzó cualquiera de las columnas, para que agregar un
+        // campo no empuje los botones fuera de la ventana.
+        private const int ColumnaIzquierda = 15;
+        private const int EtiquetaIzquierda = 115;
+        private const int CampoIzquierdo = ColumnaIzquierda + EtiquetaIzquierda + 10;
+
+        private const int ColumnaDerecha = 380;
+        private const int EtiquetaDerecha = 130;
+        private const int CampoDerecho = ColumnaDerecha + EtiquetaDerecha + 10;
+
+        private const int AnchoCampo = 170;
+        private const int AnchoImporte = 130;
         private const int SaltoFila = 30;
 
+        private int _columnaX;
+        private int _anchoEtiqueta;
+        private int _campoX;
         private int _filaY;
 
         /// <summary>
@@ -41,7 +54,7 @@ namespace CoopSig.Forms
 
         private ComboBox _cmbMes;
         private TextBox _txtAnio;
-        private DateTimePicker _dtpFecha;
+        private TextBox _txtFecha;
         private ComboBox _cmbServicio;
         private TextBox _txtHoras;
         private TextBox _txtValorHora;
@@ -57,8 +70,6 @@ namespace CoopSig.Forms
         private Label _lblHaberes;
         private Label _lblDescuentos;
         private Label _lblNeto;
-
-        private Button _btnGuardar;
 
         /// <param name="asociado">Persona a la que se le carga el bono.</param>
         /// <param name="idBono">Null para un bono nuevo; con valor, abre ese bono existente.</param>
@@ -91,77 +102,98 @@ namespace CoopSig.Forms
         {
             Text = _idBono.HasValue ? "Editar bono" : "Nuevo bono";
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(760, 560);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MinimizeBox = false;
             MaximizeBox = false;
             KeyPreview = true;
             Font = new Font("Segoe UI", 9.5F);
 
-            _filaY = 15;
+            var yEncabezado = AgregarTituloDePersona();
 
-            AgregarTituloDePersona();
+            // -- Columna izquierda: período, servicio y haberes --
+            IniciarColumna(ColumnaIzquierda, EtiquetaIzquierda, CampoIzquierdo, yEncabezado);
 
             _cmbMes = AgregarComboBox("Período");
-            _cmbMes.Items.AddRange(Periodo.Meses().Cast<object>().ToArray());
-
-            // El año va al lado del mes, en la misma fila.
             _txtAnio = new TextBox
             {
-                Location = new Point(IzquierdaCampo + AnchoCampo + 10, _cmbMes.Top),
-                Size = new Size(70, 25),
+                Location = new Point(_cmbMes.Right + 10, _cmbMes.Top),
+                Size = new Size(60, 25),
                 MaxLength = 4
             };
             RegistrarAvanceConEnter(_txtAnio);
             Controls.Add(_txtAnio);
 
-            _dtpFecha = AgregarSelectorDeFecha("Fecha");
+            _txtFecha = AgregarTextBox("Fecha");
+            _txtFecha.Size = new Size(110, 25);
+            _txtFecha.MaxLength = 10;
+            Controls.Add(new Label
+            {
+                Text = "dd/mm/aaaa",
+                Location = new Point(_txtFecha.Right + 8, _txtFecha.Top + 4),
+                AutoSize = true,
+                ForeColor = Color.DimGray
+            });
+
             _cmbServicio = AgregarComboBox("Servicio *");
 
             AgregarSeparador("Haberes");
             _txtHoras = AgregarImporte("Horas");
             _txtValorHora = AgregarImporte("Valor hora");
-            _lblTotalHoras = AgregarTotalEnFila("Horas × valor hora", _txtValorHora.Bottom + 6);
-            _filaY += SaltoFila;
-
+            _lblTotalHoras = AgregarTotal("Horas × valor hora");
             _txtComentario = AgregarTextBox("Concepto");
             _txtBasico = AgregarImporte("Básico");
 
+            var finIzquierda = _filaY;
+
+            // -- Columna derecha: descuentos --
+            IniciarColumna(ColumnaDerecha, EtiquetaDerecha, CampoDerecho, yEncabezado);
+
             AgregarSeparador("Descuentos");
-            _lblLey20337 = AgregarTotalEnFila("Ley 20337 (2%)", _filaY + 4);
-            _filaY += SaltoFila;
+            _lblLey20337 = AgregarTotal("Ley 20337 (2%)");
             _txtMutual = AgregarImporte("Seguro / Mutual");
             _txtAnticipo = AgregarImporte("Anticipo");
             _txtOtrosComentario = AgregarTextBox("Concepto de otros");
             _txtOtros = AgregarImporte("Otros");
 
-            AgregarSeparador("Totales");
-            _lblHaberes = AgregarTotalEnFila("Total de haberes", _filaY + 4);
-            _filaY += 26;
-            _lblDescuentos = AgregarTotalEnFila("Total descuentos", _filaY + 4);
-            _filaY += 26;
-            _lblNeto = AgregarTotalEnFila("Neto a cobrar", _filaY + 4);
-            _lblNeto.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            _filaY += 40;
+            var finDerecha = _filaY;
 
-            _btnGuardar = new Button
+            // -- Totales y botones, cruzando las dos columnas --
+            IniciarColumna(ColumnaIzquierda, EtiquetaIzquierda, CampoIzquierdo,
+                Math.Max(finIzquierda, finDerecha) + 10);
+
+            AgregarSeparador("Totales");
+            _lblHaberes = AgregarTotal("Total de haberes");
+            _lblDescuentos = AgregarTotal("Total descuentos");
+            _lblNeto = AgregarTotal("Neto a cobrar");
+            _lblNeto.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
+
+            _filaY += 14;
+
+            var btnGuardar = new Button
             {
                 Text = "&Guardar",
-                Location = new Point(MargenIzquierdo, _filaY),
-                Size = new Size(120, 34)
+                Location = new Point(ColumnaIzquierda, _filaY),
+                Size = new Size(130, 36),
+                Font = new Font("Segoe UI", 10F)
             };
-            _btnGuardar.Click += (s, e) => Guardar();
+            btnGuardar.Click += (s, e) => Guardar();
 
             var btnCancelar = new Button
             {
                 Text = "&Cancelar",
-                Location = new Point(MargenIzquierdo + 130, _filaY),
-                Size = new Size(120, 34)
+                Location = new Point(ColumnaIzquierda + 140, _filaY),
+                Size = new Size(130, 36),
+                Font = new Font("Segoe UI", 10F)
             };
             btnCancelar.Click += (s, e) => Close();
 
-            Controls.Add(_btnGuardar);
+            Controls.Add(btnGuardar);
             Controls.Add(btnCancelar);
+
+            // La ventana se dimensiona DESPUÉS de armar todo, a partir de dónde
+            // terminaron los controles. Fijar el alto a mano fue lo que dejó los
+            // botones y el neto fuera de la pantalla.
+            ClientSize = new Size(700, btnGuardar.Bottom + 15);
 
             // Enter avanza de campo, no dispara Guardar (mismo criterio que la
             // ficha de asociado). Al llegar al botón, Enter sí lo activa.
@@ -169,16 +201,23 @@ namespace CoopSig.Forms
             CancelButton = btnCancelar;
         }
 
-        private void AgregarTituloDePersona()
+        private void IniciarColumna(int columnaX, int anchoEtiqueta, int campoX, int y)
+        {
+            _columnaX = columnaX;
+            _anchoEtiqueta = anchoEtiqueta;
+            _campoX = campoX;
+            _filaY = y;
+        }
+
+        private int AgregarTituloDePersona()
         {
             Controls.Add(new Label
             {
                 Text = _asociado.NombreCompleto,
-                Location = new Point(MargenIzquierdo, _filaY),
+                Location = new Point(ColumnaIzquierda, 15),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold)
             });
-            _filaY += 26;
 
             Controls.Add(new Label
             {
@@ -186,11 +225,12 @@ namespace CoopSig.Forms
                     "Documento {0}{1}",
                     _asociado.Documento,
                     _asociado.Cuit == null ? string.Empty : "   ·   CUIL " + _asociado.Cuit),
-                Location = new Point(MargenIzquierdo, _filaY),
+                Location = new Point(ColumnaIzquierda, 41),
                 AutoSize = true,
                 ForeColor = Color.DimGray
             });
-            _filaY += 32;
+
+            return 73;
         }
 
         private void AgregarSeparador(string titulo)
@@ -198,7 +238,7 @@ namespace CoopSig.Forms
             Controls.Add(new Label
             {
                 Text = titulo,
-                Location = new Point(MargenIzquierdo, _filaY),
+                Location = new Point(_columnaX, _filaY),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(60, 60, 120)
@@ -211,8 +251,8 @@ namespace CoopSig.Forms
             Controls.Add(new Label
             {
                 Text = texto,
-                Location = new Point(MargenIzquierdo, _filaY + 4),
-                Size = new Size(AnchoEtiqueta, 20)
+                Location = new Point(_columnaX, _filaY + 4),
+                Size = new Size(_anchoEtiqueta, 20)
             });
         }
 
@@ -221,8 +261,8 @@ namespace CoopSig.Forms
             AgregarEtiquetaDeFila(etiqueta);
             var caja = new TextBox
             {
-                Location = new Point(IzquierdaCampo, _filaY),
-                Size = new Size(AnchoCampo + 80, 25)
+                Location = new Point(_campoX, _filaY),
+                Size = new Size(AnchoCampo, 25)
             };
             Controls.Add(caja);
             RegistrarAvanceConEnter(caja);
@@ -231,17 +271,17 @@ namespace CoopSig.Forms
         }
 
         /// <summary>
-        /// Campo de importe: alineado a la derecha y con recálculo en vivo,
-        /// para que el neto se vea cambiar mientras se carga.
+        /// Campo de importe. El texto se escribe alineado a la izquierda, como
+        /// cualquier otro campo: alinearlo a la derecha hace que el cursor
+        /// arranque pegado al borde y desconcierta al tipear.
         /// </summary>
         private TextBox AgregarImporte(string etiqueta)
         {
             AgregarEtiquetaDeFila(etiqueta);
             var caja = new TextBox
             {
-                Location = new Point(IzquierdaCampo, _filaY),
-                Size = new Size(120, 25),
-                TextAlign = HorizontalAlignment.Right
+                Location = new Point(_campoX, _filaY),
+                Size = new Size(AnchoImporte, 25)
             };
             caja.TextChanged += (s, e) =>
             {
@@ -261,7 +301,7 @@ namespace CoopSig.Forms
             AgregarEtiquetaDeFila(etiqueta);
             var combo = new ComboBox
             {
-                Location = new Point(IzquierdaCampo, _filaY),
+                Location = new Point(_campoX, _filaY),
                 Size = new Size(AnchoCampo, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
@@ -271,43 +311,25 @@ namespace CoopSig.Forms
             return combo;
         }
 
-        private DateTimePicker AgregarSelectorDeFecha(string etiqueta)
-        {
-            AgregarEtiquetaDeFila(etiqueta);
-            var selector = new DateTimePicker
-            {
-                Location = new Point(IzquierdaCampo, _filaY),
-                Size = new Size(140, 25),
-                Format = DateTimePickerFormat.Short,
-                ShowCheckBox = true,
-                Checked = true,
-                Value = DateTime.Today
-            };
-            Controls.Add(selector);
-            RegistrarAvanceConEnter(selector);
-            _filaY += SaltoFila;
-            return selector;
-        }
-
         /// <summary>Renglón de total: etiqueta a la izquierda, importe a la derecha.</summary>
-        private Label AgregarTotalEnFila(string etiqueta, int y)
+        private Label AgregarTotal(string etiqueta)
         {
             Controls.Add(new Label
             {
                 Text = etiqueta + ":",
-                Location = new Point(MargenIzquierdo, y),
-                Size = new Size(AnchoEtiqueta + 60, 22),
-                TextAlign = ContentAlignment.MiddleLeft
+                Location = new Point(_columnaX, _filaY + 4),
+                Size = new Size(_anchoEtiqueta + 40, 22)
             });
 
             var valor = new Label
             {
-                Location = new Point(IzquierdaCampo + 60, y),
-                Size = new Size(160, 22),
+                Location = new Point(_campoX, _filaY),
+                Size = new Size(AnchoImporte + 40, 24),
                 TextAlign = ContentAlignment.MiddleRight,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
             Controls.Add(valor);
+            _filaY += 28;
             return valor;
         }
 
@@ -359,6 +381,7 @@ namespace CoopSig.Forms
 
             _cmbMes.SelectedItem = Periodo.NombreDeMes(DateTime.Today.Month);
             _txtAnio.Text = DateTime.Today.Year.ToString(CultureInfo.InvariantCulture);
+            _txtFecha.Text = DateTime.Today.ToString("dd/MM/yyyy", CultureInfo.CurrentCulture);
 
             // El servicio se propone desde el asociado, pero se puede cambiar:
             // el bono guarda el suyo propio y no siempre coincide.
@@ -385,16 +408,9 @@ namespace CoopSig.Forms
                 {
                     _cmbMes.SelectedItem = _bonoActual.PeriodoMes;
                     _txtAnio.Text = _bonoActual.PeriodoAnio;
-
-                    if (_bonoActual.Fecha.HasValue)
-                    {
-                        _dtpFecha.Value = _bonoActual.Fecha.Value;
-                        _dtpFecha.Checked = true;
-                    }
-                    else
-                    {
-                        _dtpFecha.Checked = false;
-                    }
+                    _txtFecha.Text = _bonoActual.Fecha.HasValue
+                        ? _bonoActual.Fecha.Value.ToString("dd/MM/yyyy", CultureInfo.CurrentCulture)
+                        : string.Empty;
 
                     SeleccionarOAgregar(_cmbServicio, _bonoActual.Servicio);
 
@@ -518,7 +534,7 @@ namespace CoopSig.Forms
                 Servicio = _cmbServicio.SelectedItem as string,
                 PeriodoMes = mes,
                 PeriodoAnio = anio,
-                Fecha = _dtpFecha.Checked ? (DateTime?)_dtpFecha.Value.Date : null,
+                Fecha = LeerFecha(),
                 Horas = LeerImporte(_txtHoras),
                 ValorHora = LeerImporte(_txtValorHora),
                 Basico = LeerImporte(_txtBasico),
@@ -543,6 +559,11 @@ namespace CoopSig.Forms
                 || anio.Length != 4)
             {
                 return "El año del período debe tener cuatro dígitos.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(_txtFecha.Text) && !LeerFecha().HasValue)
+            {
+                return "La fecha no se entiende. Escribala como dd/mm/aaaa, por ejemplo 05/03/2026.";
             }
 
             if (_cmbServicio.SelectedItem == null)
@@ -591,6 +612,26 @@ namespace CoopSig.Forms
                 MessageBoxIcon.Warning);
 
             return respuesta == DialogResult.Yes;
+        }
+
+        /// <summary>
+        /// Fecha tipeada a mano. Vacía es válida: no todos los bonos la tienen,
+        /// y en los datos históricos contradice al período, así que no se usa
+        /// para nada más que dejarla registrada.
+        /// </summary>
+        private DateTime? LeerFecha()
+        {
+            var texto = _txtFecha.Text.Trim();
+            if (texto.Length == 0)
+            {
+                return null;
+            }
+
+            DateTime fecha;
+            return DateTime.TryParse(
+                texto, CultureInfo.CurrentCulture, DateTimeStyles.None, out fecha)
+                ? (DateTime?)fecha.Date
+                : null;
         }
 
         /// <summary>
