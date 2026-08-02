@@ -58,20 +58,28 @@ namespace CoopSig.Data
         /// Une los nombres de la tabla de catálogo con los valores distintos
         /// ya usados en Asociados, para que ningún valor histórico desaparezca
         /// del listado aunque no esté dado de alta en el catálogo.
+        ///
+        /// La columna del catálogo se llama igual que su tabla: la tabla
+        /// Servicio tiene una única columna Servicio, que además es su clave
+        /// principal. No existe ninguna columna Nombre — pedirla era la causa
+        /// del error "No se han especificado valores para algunos de los
+        /// parámetros requeridos": Access no reconoce el identificador y lo
+        /// toma por un parámetro sin valor.
         /// </summary>
         private static List<string> ObtenerValoresDistintosUnidos(string tablaCatalogo, string columnaAsociados)
         {
             try
             {
                 return Consultar(
-                    "SELECT Nombre FROM " + tablaCatalogo +
+                    "SELECT " + tablaCatalogo + " FROM " + tablaCatalogo +
                     " UNION " + SelectValoresEnUso(columnaAsociados) +
                     " ORDER BY 1");
             }
             catch (OleDbException)
             {
-                // Esta base puede no tener la tabla de catálogo, o tenerla con
-                // otro nombre de columna. Los valores ya cargados en Asociados
+                // El repliegue se mantiene: la convención "columna igual que la
+                // tabla" está verificada en Servicio, pero no en Cargo. Los
+                // valores ya cargados en Asociados
                 // alcanzan por sí solos (Decisión de mapeo #3, plan.md): sin
                 // este repliegue las listas quedan vacías y, al ser
                 // DropDownList, el alta y la edición se vuelven imposibles.
