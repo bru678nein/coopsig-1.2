@@ -215,9 +215,10 @@ huérfanos la vez anterior.
 
 ## 10. Impresión del bono — informe de Access ✅
 
-El recibo se imprime desde un informe de Access. La ventana relevada se titula
-**`Sueldo`**, no `Bono` — hay informes con los dos nombres y falta confirmar
-cuál se usa para imprimir ❓.
+El recibo se imprime desde un informe de Access. **Existen dos informes con el
+mismo diseño**: uno se abre con el título `Sueldo` y otro con el título `Bono`
+✅ (relevados ambos). Falta confirmar cuál usa la oficina en la práctica ❓ —
+para el port da igual, el diseño es el mismo.
 
 ### Encabezado fijo del recibo
 
@@ -253,12 +254,17 @@ es el recibo que la persona firma.
 
 **1. Existe un descuento del 2% (Ley 20337) que no está en la tabla.** Se
 calcula al imprimir sobre `[Haberes]` y no hay ninguna columna en `Bono` que lo
-guarde. La fórmula de `plan.md` no lo contempla. ⚠️ Ver R1.
+guarde. **Se resta** ✅. La fórmula de `plan.md` no lo contempla. ⚠️ Ver R1.
 
-**2. `Enletras()` es una función VBA que vive dentro de la base.** Convierte el
-importe a letras para el recibo. Confirma que la base tiene código VBA propio —
-figuraba como incógnita desde el relevamiento original. Al portar la impresión a
-C# hay que reescribirla.
+**2. `Enletras()` es una función VBA que vive dentro de la base, y hoy falla.**
+Convierte el importe a letras para el recibo. En la Vista Preliminar relevada, el
+renglón "Recibí la cantidad de Pesos" imprime **`#Error`** ⚠️ — es decir, los
+recibos que salen hoy no muestran el importe en letras.
+
+Causa más probable: el archivo no está en una ubicación de confianza de Access y
+el VBA queda bloqueado, que es el motivo clásico de `#Error` en una función
+propia. No bloquea este proyecto —el importe en letras se escribe en C#— pero es
+un defecto activo del sistema actual y conviene avisarlo en la oficina.
 
 ### Nota sobre el vocabulario
 
@@ -267,23 +273,114 @@ El recibo usa esa terminología y la interfaz debería respetarla.
 
 ---
 
-## 11. Reglas de negocio
+## 11. Pantalla de carga del sistema actual ✅
 
-### R1 — Fórmula del bono ⚠️ incompleta
+Relevada del programa en uso (`Cooperativa de Trabajo SIG - [Form1]`).
 
-Lo verificado contra los registros históricos reales:
+### Menú del sistema viejo
 
 ```
-Total = (Horas × ValorHora) + Basico − Mutual − Anticipo − Otros
+Asociados   Pagos   Altas   Imprimir   Salir
 ```
 
-**Esta fórmula está incompleta.** El informe de impresión aplica además un
-descuento de **Ley 20337 (2%) sobre los haberes**, que no está guardado en
-ninguna columna de `Bono`. Falta confirmar si ese 2% entra en "Total Descuentos"
-y por lo tanto reduce el neto ❓.
+`Pagos` es el módulo de bonos — coincide con que la clave de `Bono` se muestre
+como "Id de pago": internamente al bono le dicen *pago*. `Imprimir` responde la
+pregunta sobre la cuarta opción del menú que quedó abierta en el borrador 0.1.
 
-Construir el módulo con la fórmula de arriba produciría totales **2% por encima**
-de lo que la cooperativa paga hoy. Es un error silencioso y en plata.
+### Disposición de la pantalla de bono
+
+**Se carga de a un bono por vez**, no en tanda. Encabezado con la persona y el
+período, cuerpo con importes, y botones Cerrar / Cancelar / Guardar.
+
+| Zona | Campos |
+|---|---|
+| Identificación | `Apellido` (se tipea), `Nombre` y `N° CUIL` (se completan solos) |
+| Cabecera derecha | `Fecha` (precargada con hoy), `Periodo` = mes desplegable + año |
+| Servicio | Desplegable, **se elige en el bono**, no se hereda del asociado |
+| Haberes | `Horas` × `ValorHora` = importe; debajo `Comentario` + `Basico` |
+| Descuentos | `Ley 20337 (2%)` calculada, `Mutual`, `Anticipo`, `OtrosComentario` + `Otros` |
+| Totales | Total de haberes, Total Descuentos, Neto a Cobrar |
+
+### Lo que esta pantalla confirma
+
+- **`Ley 20337` no tiene casilla de carga**: es calculada y mostrada, nunca
+  escrita ni guardada ✅.
+- **`Otros` está en la columna de descuentos**, junto a Mutual y Anticipo ✅.
+- **`Anticipo` se escribe a mano hoy.** La operadora tiene que acordarse de
+  consultar el pendiente. Autocompletarlo desde `Anticipos` (ver R5) es una
+  mejora sobre el sistema actual, no una réplica.
+- **`Fecha` es un campo aparte precargado con la fecha del día**, independiente
+  del período. Explica por qué contradice al período en los datos históricos y
+  confirma que no sirve para filtrar.
+- **El flujo es de a uno.** La pantalla nueva debe ser buscador + ficha con
+  avance por Enter, igual que Asociados — no una grilla editable en tanda.
+
+---
+
+## 12. Reglas de negocio
+
+### R1 — Fórmula del bono ✅ completa y verificada
+
+```
+Total Horas      = Horas × ValorHora
+Haberes          = Basico + Total Horas          ← también rotulado
+                                                   "Total Excedentes Repartibles"
+Ley 20337        = Haberes × 0,02
+Total Descuentos = Mutual + Anticipo + Otros + Ley 20337
+Neto a Cobrar    = Haberes − Total Descuentos
+```
+
+Equivalente compacto:
+
+```
+Neto = (Basico + Horas × ValorHora) × 0,98 − Mutual − Anticipo − Otros
+```
+
+**`Haberes` incluye el básico** ✅. Confirmado leyendo la propiedad *Origen del
+control* del cuadro `Haberes` en el informe: `=[Basico]+[Total Horas]`.
+"Haberes" y "Total Excedentes Repartibles" son el mismo valor con dos etiquetas
+distintas en el recibo.
+
+La fórmula que figura en `specs/001-modulo-asociados/plan.md` —
+`(Horas × ValorHora) + Basico − Mutual − Anticipo − Otros`— es correcta salvo
+que **omite el descuento del 2%**. Ese 2% no está guardado en ninguna columna de
+`Bono`: se calcula al imprimir, y hay que recalcularlo igual en el port.
+
+**El 2% se resta y entra en "Total Descuentos"** ✅, junto con seguro, anticipo
+y otros.
+
+### Verificación contra recibo impreso ✅
+
+VILLEGAS, CAROLINA ELIZABETH — OSEP VIGILANCIA — ENERO 2020:
+
+| Concepto | Valor | Comprobación |
+|---|---|---|
+| 228 horas × $40,00 | $9.120,00 | ✅ |
+| Ley 20337 (2%) | $182,40 | `9.120 × 0,02` ✅ |
+| Seguro / Anticipo / Otros | $0,00 | |
+| Total Excedentes Repartibles | $9.120,00 | |
+| Total Descuentos | $182,40 | incluye la Ley 20337 ✅ |
+| **Neto a Cobrar** | **$8.937,60** | `9.120 − 182,40` ✅ |
+
+Cierra al centavo. La etiqueta **"Seguro" del recibo corresponde a la columna
+`Mutual`** de la tabla ✅.
+
+### Confirmación cruzada del 2% sobre el básico ✅
+
+Además del *Origen del control*, los propios datos lo confirman. Bonos de
+`COOPERATIVA SIG` sin horas, con solo básico:
+
+| `Basico` | menos 2% | Resultado |
+|---:|---:|---|
+| $612.244,90 | $12.244,90 | **$600.000,00** exacto |
+| $586.734,70 | $11.734,69 | **$575.000,00** exacto |
+
+Esos básicos se fijaron trabajando hacia atrás desde un neto redondo
+(`600.000 ÷ 0,98 = 612.244,90`). Si el 2% no se aplicara al básico, no habría
+motivo para elegir un número así en lugar de $600.000 directo.
+
+La fila con básico $600.000,00 exacto corresponde a un `PREMIO`: ese se fijó en
+bruto, no en neto. Lógica distinta y consistente.
 
 Tres hallazgos que salieron de mirar los datos, no de suponer:
 
@@ -339,7 +436,7 @@ Ni para anticipos ni para bonos. Solo `PeriodoMes` + `PeriodoAño`.
 
 ---
 
-## 12. Estrategia de datos
+## 13. Estrategia de datos
 
 | Entidad | Estrategia | Motivo |
 |---|---|---|
@@ -349,31 +446,35 @@ Ni para anticipos ni para bonos. Solo `PeriodoMes` + `PeriodoAño`.
 
 ---
 
-## 13. Pendientes
+## 14. Pendientes
 
 | # | Pendiente | Cómo se resuelve | Bloquea |
 |---|---|---|---|
-| 1 | **Si el 2% de Ley 20337 se resta del neto** | Vista Preliminar del informe con un bono real, y comparar contra los valores guardados | **Todo cálculo de bonos** |
-| 2 | Fórmulas del informe cortadas a la derecha | Foto de la vista Diseño con la columna de cálculo completa | La impresión |
-| 3 | Si se imprime desde el informe `Sueldo` o desde `Bono` | Preguntar en la oficina / abrir los dos | La impresión |
-| 4 | Código de la función VBA `Enletras()` | Access → Alt+F11 → módulos | La impresión |
-| 5 | Agregar `PeriodoMes` y `PeriodoAño` a `Anticipos` | Vista Diseño → dos filas nuevas | El módulo de anticipos |
-| 6 | Estructura de `Cargo` | Vista Diseño | Nada (hay repliegue) |
-| 7 | Medidas del papel y si es preimpreso | Configurar página del informe | La impresión |
-| 8 | Qué hacer si el anticipo supera al bono | Decisión de negocio | Nada por ahora |
-| 9 | Cómo anular bonos de forma consultable | Decisión de negocio | R4 |
-| 10 | Discrepancia de conteo: 31.007 vs 33.578 en `plan.md` | Puede ser la base de la otra oficina | Nada |
+| 1 | Agregar `PeriodoMes` y `PeriodoAño` a `Anticipos` | Vista Diseño → dos filas nuevas | El módulo de anticipos |
+| 2 | Medidas del papel y si es preimpreso | Configurar página del informe | La impresión |
+| 3 | Fórmulas del informe cortadas a la derecha | Foto de la vista Diseño con la columna de cálculo completa | La impresión |
+| 4 | Estructura de `Cargo` | Vista Diseño | Nada (hay repliegue) |
+| 5 | Por qué `Enletras()` devuelve `#Error` hoy | Probable VBA bloqueado por ubicación no confiable. Avisar en la oficina | Nada (se reescribe en C#) |
+| 6 | Cuál de los dos informes usa la oficina | Preguntar. Para el port da igual: mismo diseño | Nada |
+| 7 | Qué hacer si el anticipo supera al bono | Decisión de negocio | Nada por ahora |
+| 8 | Cómo anular bonos de forma consultable | Decisión de negocio | R4 |
+| 9 | Discrepancia de conteo: 31.007 vs 33.578 en `plan.md` | Puede ser la base de la otra oficina | Nada |
+
+**Resuelto:** la base de cálculo del 2% de Ley 20337 — ver R1. Era el pendiente
+que bloqueaba todo el módulo de bonos.
 
 ---
 
-## 14. Estado del sistema
+## 15. Estado del sistema
 
 **Módulo de Asociados: terminado y en uso.** Búsqueda por documento o apellido
 con filtrado mientras se tipea, filtro por servicio, alta y edición con los
 campos completos, campo único que acepta CUIT o DNI, baja lógica y
 reactivación, y respaldo automático al arrancar.
 
-**Módulo de Bonos: no iniciado.** Bloqueado por el pendiente #1 — no se puede
-calcular un total sin saber si el 2% de Ley 20337 lo reduce.
+**Módulo de Bonos: no iniciado, pero ya no bloqueado.** El esquema de `Bono` y
+la fórmula completa están verificados. La impresión sigue necesitando las
+medidas del papel (pendiente #2).
 
-**Módulo de Anticipos: no iniciado.** Bloqueado por el pendiente #5.
+**Módulo de Anticipos: no iniciado.** Bloqueado por el pendiente #1 — faltan las
+dos columnas de período en la tabla.
