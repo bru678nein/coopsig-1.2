@@ -114,6 +114,8 @@ namespace CoopSig.Forms
             IniciarColumna(ColumnaIzquierda, EtiquetaIzquierda, CampoIzquierdo, yEncabezado);
 
             _cmbMes = AgregarComboBox("Período");
+            _cmbMes.Items.AddRange(Periodo.Meses().Cast<object>().ToArray());
+
             _txtAnio = new TextBox
             {
                 Location = new Point(_cmbMes.Right + 10, _cmbMes.Top),
