@@ -50,6 +50,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsociadoRepositoryTests.cs" />
+    <Compile Include="CalculoBonoTests.cs" />
+    <Compile Include="PeriodoTests.cs" />
     <Compile Include="ValidacionesTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
