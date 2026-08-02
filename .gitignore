@@ -1,0 +1,34 @@
+# Salida de compilación
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Paquetes NuGet restaurados. packages.config SÍ se versiona:
+# es la lista de qué restaurar, no el contenido restaurado.
+packages/
+!packages.config
+
+# Bases de datos de Access. Nunca deben entrar al repositorio:
+# la base real pesa ~50 MB y contiene los datos personales de más de
+# cuatro mil asociados (documento, dirección, teléfono). Subirla a un
+# repositorio remoto sería una filtración, y borrarla después no la
+# saca del historial.
+*.mdb
+*.accdb
+*.laccdb
+
+# Copias de seguridad generadas por la aplicación
+Backups/
+
+# macOS: preferencias de vista del Finder, no del proyecto
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
