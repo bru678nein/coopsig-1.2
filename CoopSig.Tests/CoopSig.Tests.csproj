@@ -52,6 +52,7 @@
     <Compile Include="AsociadoRepositoryTests.cs" />
     <Compile Include="BonoRepositoryTests.cs" />
     <Compile Include="CalculoBonoTests.cs" />
+    <Compile Include="NumeroEnLetrasTests.cs" />
     <Compile Include="PeriodoTests.cs" />
     <Compile Include="ValidacionesTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using CoopSig.Data;
+using CoopSig.Impresion;
 using CoopSig.Models;
 using CoopSig.Utils;
 
@@ -31,6 +32,7 @@ namespace CoopSig.Forms
         private DataGridView _grilla;
         private Button _btnNuevo;
         private Button _btnEditar;
+        private Button _btnImprimir;
         private Timer _timerDebounce;
 
         /// <summary>
@@ -150,6 +152,15 @@ namespace CoopSig.Forms
             };
             _btnEditar.Click += (s, e) => AbrirBonoSeleccionado();
 
+            _btnImprimir = new Button
+            {
+                Text = "&Imprimir",
+                Location = new Point(628, 515),
+                Size = new Size(120, 34),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+            };
+            _btnImprimir.Click += (s, e) => ImprimirSeleccionado();
+
             Controls.Add(lblBuscar);
             Controls.Add(_txtBuscar);
             Controls.Add(_lstPersonas);
@@ -157,6 +168,7 @@ namespace CoopSig.Forms
             Controls.Add(_grilla);
             Controls.Add(_btnNuevo);
             Controls.Add(_btnEditar);
+            Controls.Add(_btnImprimir);
 
             _timerDebounce = new Timer { Interval = 300 };
             _timerDebounce.Tick += (s, e) =>
@@ -305,6 +317,7 @@ namespace CoopSig.Forms
             // bonos históricos se pueden consultar y corregir.
             _btnNuevo.Enabled = _asociadoElegido != null && _asociadoElegido.Activo;
             _btnEditar.Enabled = ObtenerBonoSeleccionado() != null;
+            _btnImprimir.Enabled = ObtenerBonoSeleccionado() != null;
         }
 
         private Bono ObtenerBonoSeleccionado()
@@ -351,6 +364,35 @@ namespace CoopSig.Forms
                 {
                     CargarBonos();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Abre la vista previa antes de imprimir. No se manda directo a la
+        /// impresora a propósito: un recibo mal salido es papel tirado y una
+        /// firma que hay que volver a pedir.
+        /// </summary>
+        private void ImprimirSeleccionado()
+        {
+            var bono = ObtenerBonoSeleccionado();
+            if (bono == null)
+            {
+                return;
+            }
+
+            try
+            {
+                using (var documento = new ReciboBono(bono).CrearDocumento())
+                using (var vistaPrevia = new PrintPreviewDialog())
+                {
+                    vistaPrevia.Document = documento;
+                    vistaPrevia.WindowState = FormWindowState.Maximized;
+                    vistaPrevia.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MostrarError("No se pudo preparar el recibo para imprimir.", ex);
             }
         }
 

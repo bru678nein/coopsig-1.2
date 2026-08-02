@@ -57,6 +57,7 @@
     <Compile Include="Forms\FrmBonoDetalle.cs" />
     <Compile Include="Forms\FrmBonos.cs" />
     <Compile Include="Forms\FrmPrincipal.cs" />
+    <Compile Include="Impresion\ReciboBono.cs" />
     <Compile Include="Models\Asociado.cs" />
     <Compile Include="Models\Bono.cs" />
     <Compile Include="Models\Cargo.cs" />
@@ -65,6 +66,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Utils\BackupService.cs" />
     <Compile Include="Utils\CalculoBono.cs" />
+    <Compile Include="Utils\NumeroEnLetras.cs" />
     <Compile Include="Utils\Periodo.cs" />
     <Compile Include="Utils\Validaciones.cs" />
   </ItemGroup>
