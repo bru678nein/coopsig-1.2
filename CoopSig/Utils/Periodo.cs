@@ -106,20 +106,49 @@ namespace CoopSig.Utils
         }
 
         /// <summary>
-        /// Compara dos períodos cronológicamente. Los períodos que no se pueden
-        /// interpretar quedan al final, para que un dato roto no se cuele como
-        /// si fuera el más antiguo.
+        /// Compara dos períodos cronológicamente, del más antiguo al más
+        /// reciente.
         /// </summary>
         public static int Comparar(
             string mesIzquierdo, string anioIzquierdo,
             string mesDerecho, string anioDerecho)
         {
-            var izquierdo = ClaveDeOrden(mesIzquierdo, anioIzquierdo);
-            var derecho = ClaveDeOrden(mesDerecho, anioDerecho);
+            return Comparar(
+                ClaveDeOrden(mesIzquierdo, anioIzquierdo),
+                ClaveDeOrden(mesDerecho, anioDerecho),
+                descendente: false);
+        }
 
+        /// <summary>
+        /// Compara dos períodos del más reciente al más antiguo.
+        ///
+        /// Existe como método propio en lugar de invertir los argumentos de
+        /// Comparar: ese truco da vuelta TODO, incluida la regla de que un
+        /// período ilegible va al final, y termina ascendiendo el dato roto a
+        /// la cabeza del listado.
+        /// </summary>
+        public static int CompararDescendente(
+            string mesIzquierdo, string anioIzquierdo,
+            string mesDerecho, string anioDerecho)
+        {
+            return Comparar(
+                ClaveDeOrden(mesIzquierdo, anioIzquierdo),
+                ClaveDeOrden(mesDerecho, anioDerecho),
+                descendente: true);
+        }
+
+        /// <summary>
+        /// Un período que no se puede interpretar queda al final en las dos
+        /// direcciones. Invertir el orden cronológico no debe convertir un
+        /// dato roto en el más reciente.
+        /// </summary>
+        private static int Comparar(int? izquierdo, int? derecho, bool descendente)
+        {
             if (izquierdo.HasValue && derecho.HasValue)
             {
-                return izquierdo.Value.CompareTo(derecho.Value);
+                return descendente
+                    ? derecho.Value.CompareTo(izquierdo.Value)
+                    : izquierdo.Value.CompareTo(derecho.Value);
             }
             if (izquierdo.HasValue)
             {

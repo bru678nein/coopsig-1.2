@@ -47,9 +47,9 @@ namespace CoopSig.Data
             var bonos = Consultar(sql, comando =>
                 comando.Parameters.AddWithValue("@documento", documento));
 
-            bonos.Sort((izquierdo, derecho) => Periodo.Comparar(
-                derecho.PeriodoMes, derecho.PeriodoAnio,
-                izquierdo.PeriodoMes, izquierdo.PeriodoAnio));
+            bonos.Sort((izquierdo, derecho) => Periodo.CompararDescendente(
+                izquierdo.PeriodoMes, izquierdo.PeriodoAnio,
+                derecho.PeriodoMes, derecho.PeriodoAnio));
 
             return bonos;
         }

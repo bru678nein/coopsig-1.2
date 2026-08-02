@@ -70,6 +70,24 @@ namespace CoopSig.Tests
         }
 
         [TestMethod]
+        public void CompararDescendente_ElMasRecienteVaPrimero()
+        {
+            Assert.IsTrue(
+                Periodo.CompararDescendente("ENERO", "2020", "DICIEMBRE", "2019") < 0);
+        }
+
+        [TestMethod]
+        public void CompararDescendente_PeriodoIlegible_SigueQuedandoAlFinal()
+        {
+            // Invertir el orden cronológico no debe ascender un dato roto a la
+            // cabeza del listado. Esto falló una vez: el orden descendente se
+            // hacía invirtiendo los argumentos de Comparar, y eso daba vuelta
+            // también esta regla.
+            Assert.IsTrue(
+                Periodo.CompararDescendente("BASURA", "2020", "ENERO", "2020") > 0);
+        }
+
+        [TestMethod]
         public void Meses_DevuelveLosDoceEnOrdenCronologico()
         {
             var meses = Periodo.Meses();

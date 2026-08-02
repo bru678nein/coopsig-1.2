@@ -89,11 +89,11 @@ namespace CoopSig.Tests
 
             for (var i = 1; i < bonos.Count; i++)
             {
-                var comparacion = Periodo.Comparar(
+                var comparacion = Periodo.CompararDescendente(
                     bonos[i - 1].PeriodoMes, bonos[i - 1].PeriodoAnio,
                     bonos[i].PeriodoMes, bonos[i].PeriodoAnio);
 
-                Assert.IsTrue(comparacion >= 0, "El listado no quedó en orden cronológico.");
+                Assert.IsTrue(comparacion <= 0, "El listado no quedó en orden cronológico.");
             }
         }
 
@@ -119,9 +119,9 @@ namespace CoopSig.Tests
         /// </summary>
         private static void OrdenarDelMasRecienteAlMasAntiguo(List<Bono> bonos)
         {
-            bonos.Sort((izquierdo, derecho) => Periodo.Comparar(
-                derecho.PeriodoMes, derecho.PeriodoAnio,
-                izquierdo.PeriodoMes, izquierdo.PeriodoAnio));
+            bonos.Sort((izquierdo, derecho) => Periodo.CompararDescendente(
+                izquierdo.PeriodoMes, izquierdo.PeriodoAnio,
+                derecho.PeriodoMes, derecho.PeriodoAnio));
         }
 
         private static void OmitirSiNoHayBaseDePrueba()
