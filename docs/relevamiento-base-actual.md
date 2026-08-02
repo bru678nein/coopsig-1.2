@@ -1,21 +1,37 @@
-# Sistema de Gestión de Asociados, Bonos y Anticipos
+# Relevamiento de la base Access actual
 
-**Versión del documento:** 0.1 (borrador)
-**Estado:** en definición — ver sección 11 "Blancos pendientes"
+**Versión del documento:** 1.0
+**Última verificación contra la base:** 2026-08-02
+
+---
+
+## Cómo leer este documento
+
+Este documento reemplaza por completo al borrador 0.1. Aquel describía un
+esquema que **no existe** — hablaba de `IdAsociado`, `DNI` como texto,
+`IdServicio` y una tabla `Bonos` con un campo único `Descuentos`. Ninguna de
+esas columnas está en la base. El problema no fue que estuviera equivocado: fue
+que no se notaba que lo estaba.
+
+Para que eso no vuelva a pasar, **cada dato de acá lleva marca de origen**:
+
+| Marca | Significado |
+|---|---|
+| ✅ **Verificado** | Visto en la vista Diseño o en datos reales de la base. Se puede escribir código contra esto. |
+| 🔍 **Inferido** | Deducido de una convención observada, pero no visto. Usar con repliegue. |
+| ❓ **Pendiente** | No se relevó. **No escribir código que dependa de esto.** |
+
+Regla de oro: si algo está en ❓ y se escribe un `SELECT` contra eso, Access
+responde *"No se han especificado valores para algunos de los parámetros
+requeridos"* — un error que no dice qué columna falta y hace perder una hora.
 
 ---
 
 ## 1. Objetivo
 
-Reemplazar el programa actual de la oficina por un sistema de escritorio que gestione asociados (trabajadores), bonos y anticipos, manteniendo la base de datos Microsoft Access existente sin migración de datos.
-
-### Problemas del sistema actual que hay que resolver
-
-| Problema | Solución en el nuevo sistema |
-|---|---|
-| El buscador solo busca por nombre y apellido | Buscador único que detecta DNI vs. texto |
-| Buscar "González" devuelve 40 resultados indistinguibles | Grilla con apellido, nombre, DNI y servicio en la misma fila |
-| Demasiados clics para operaciones comunes | Foco automático en el buscador, doble clic abre edición, Enter avanza campos |
+Reemplazar el programa de la oficina por un sistema de escritorio que gestione
+asociados, bonos y anticipos, **manteniendo la base Access existente sin
+migración de datos**.
 
 ---
 
@@ -23,246 +39,341 @@ Reemplazar el programa actual de la oficina por un sistema de escritorio que ges
 
 | Restricción | Detalle |
 |---|---|
-| Sistema operativo | Windows 10 (confirmar con `winver` en ambas máquinas) |
-| Hardware | PCs viejas, pocos recursos — el programa debe arrancar rápido y pesar poco |
-| Base de datos | Microsoft Access existente, **no se migra** |
-| Puestos de trabajo | 2 PCs, ambas con Office/Access instalado, viendo los mismos registros |
-| Usuarias | Personal no técnico — la interfaz tiene que ser simple y con controles grandes |
+| Sistema operativo | Windows 10 / 11, se compila en Visual Studio 2022 |
+| Base de datos | Microsoft Access `.mdb` existente, **no se migra** |
+| Tamaño | ~50 MB |
+| Ubicación | **Local en cada máquina, no en red** ✅ |
+| Instalaciones | **Dos, independientes, con bases separadas** ✅ |
+| Compilación | .NET Framework 4.8, WinForms, **x64** |
+| Proveedor | `Microsoft.ACE.OLEDB.16.0`, con repliegue a `12.0` |
+| Usuarias | Personal no técnico — interfaz simple, controles grandes |
+
+**Nota sobre la arquitectura:** el borrador anterior indicaba x86 por suponer un
+Office de 32 bits. La instalación real es de 64 bits y el proyecto compila x64.
 
 ---
 
-## 3. Stack técnico
+## 3. Objetos reales de la base ✅
 
-| Componente | Elección | Motivo |
-|---|---|---|
-| Lenguaje / framework | C# + WinForms sobre .NET Framework 4.8 | Preinstalado en Windows 10: cero despliegue de runtime, arranque rápido |
-| Acceso a datos | `System.Data.OleDb` con `Microsoft.ACE.OLEDB.12.0` | Driver ya presente al tener Access instalado |
-| Impresión | `System.Drawing.Printing.PrintDocument` | Permite posicionar cada dato al milímetro sobre la plantilla |
-| Compilación | **Plataforma x86** (no "Any CPU") | Si el Office instalado es de 32 bits, el driver ACE no carga desde un proceso de 64 bits |
+Relevado del panel de objetos de Access.
 
-### Alternativa descartada
+**Tablas:** `Anticipos`, `Asociados`, `Baja`, `Bono`, `Cargo`,
+`Errores de pegado`, `Pasivos`, `Servicio`
 
-**Nota:** este documento es un borrador previo. El stack vigente está en `specs/001-modulo-asociados/plan.md`.
+**Informes:** `Activos`, `Activos1`, `Alta`, `Anticipo`, `Anticipos`,
+`Asociados`, `Baja`, `Bono`, `Sueldo`
 
----
+Dos aclaraciones que resuelven confusiones previas:
 
-## 4. Arquitectura y despliegue
-
-```
-PC 1 (principal)                    PC 2
-├── Aplicación (.exe local)         ├── Aplicación (.exe local)
-└── Carpeta compartida              │
-    ├── base.accdb  ◄───────────────┘  (acceso por red cableada)
-    └── /backups/
-        └── base_AAAAMMDD_HHMMSS.accdb
-```
-
-### Reglas de despliegue
-
-- El archivo de Access vive en **una sola** carpeta compartida; el ejecutable se instala local en cada PC.
-- **Conexión por cable, no WiFi.** La corrupción de bases Access en red es casi siempre por caídas de conexión durante una escritura.
-- **Backup automático al abrir la aplicación:** copiar el archivo a `/backups/` con timestamp antes de cualquier operación. Conservar los últimos N backups (ver blancos pendientes).
-- Access soporta sin problemas la concurrencia de 2 usuarios: bloquea a nivel de registro, no de tabla.
-
-### Capas del código
-
-```
-/UI          → Formularios WinForms
-/Servicios   → Reglas de negocio y validaciones
-/Datos       → Repositorios con OleDb (una clase por entidad)
-/Modelos     → Clases planas (Asociado, Bono, Anticipo, Servicio)
-/Impresion   → Plantillas y lógica de PrintDocument
-```
-
-La capa de Datos es la única que conoce OleDb. Esto deja la puerta abierta a migrar a SQLite o PostgreSQL más adelante cambiando solo esa carpeta.
+- **No existen dos tablas de anticipos.** La tabla es `Anticipos` (plural). El
+  `Anticipo` en singular es un **informe**.
+- **`Errores de pegado`** es la tabla que Access genera sola cuando falla un
+  pegado masivo. Es basura, no un objeto de diseño. Ignorar.
 
 ---
 
-## 5. Modelo de datos
+## 4. Tabla `Asociados` ✅
 
-> **Nota:** el esquema real de la base existente todavía no fue relevado. Este modelo es el objetivo; hay que mapearlo contra las tablas actuales antes de escribir código.
-
-### Asociados
+Clave: `Documento`. Relevado en vista Diseño.
 
 | Campo | Tipo Access | Notas |
 |---|---|---|
-| IdAsociado | Autonumérico | PK |
-| Apellido | Texto (60) | Obligatorio |
-| Nombre | Texto (60) | Obligatorio |
-| DNI | Texto (15) | Obligatorio, único, indexado |
-| CUIL | Texto (15) | *(pendiente de confirmar — ver blancos)* |
-| FechaNacimiento | Fecha/Hora | |
-| Domicilio | Texto (120) | |
-| Teléfono | Texto (30) | |
-| IdServicio | Numérico | FK → Servicios |
-| FechaAlta | Fecha/Hora | Obligatorio |
-| Activo | Sí/No | Por defecto: Sí |
-| FechaBaja | Fecha/Hora | Nulo mientras esté activo |
-| Observaciones | Memo | |
+| `Documento` 🔑 | Número | Clave de hecho del sistema |
+| `Apellido`, `Nombre` | Texto corto | Obligatorios en la aplicación |
+| `CUIL` | Número | Prefijo fiscal (20, 23, 27) |
+| `Digito` | Número | Dígito verificador |
+| `NumeroSocio` | Número | Número de socio de la cooperativa |
+| `FechaNacimiento` | Fecha/Hora | |
+| `Sexo` | Texto corto | Sin tabla de catálogo |
+| `EstadoCivil` | Texto corto | Sin tabla de catálogo |
+| `Direccion` | Texto corto | |
+| `Telefono` | Texto corto | |
+| `Servicio` | Texto corto | **Texto, no FK** |
+| `Cargo` | Texto corto | **Texto, no FK** |
+| `FechaIngreso` | Fecha/Hora | |
+| `FechaBaja` | Fecha/Hora | Nulo = activo |
+| `Libro`, `Folio`, `Acta` | Texto | Registro del libro de actas |
+| `FechaActa` | Fecha/Hora | |
+| `ActaBaja`, `FechaActaBaja` | Texto / Fecha | |
+| `Impreso` | Sí/No | Uso desconocido ❓ |
+| `Notas` | Texto largo | **Agregada para este sistema** |
 
-**DNI como texto, no numérico.** Evita perder ceros a la izquierda y permite documentos extranjeros.
+**El estado activo/inactivo no es una columna.** Se deriva de `FechaBaja IS
+NULL`. Dar de baja escribe la fecha; reactivar la limpia. Nunca se borra una
+fila.
 
-### Servicios
+**`Documento` es Número, no texto.** El borrador decía lo contrario.
+`Convert.ToInt64` es correcto.
+
+---
+
+## 5. Tabla `Bono` ✅
+
+Nombre en **singular**. ~31.007 registros.
 
 | Campo | Tipo Access | Notas |
 |---|---|---|
-| IdServicio | Autonumérico | PK |
-| Nombre | Texto (60) | Único |
-| Activo | Sí/No | |
+| `Id` 🔑 | Autonumeración | ✅ Verificado. Access lo muestra como "Id de pago" |
+| `Fecha` | Fecha/Hora | ⚠️ **No confiable** — ver abajo |
+| `PeriodoMes` | Texto corto | Nombre del mes: `"ENERO"`, `"DICIEMBRE"` |
+| `PeriodoAño` | Texto corto | Año de 4 dígitos: `"2018"` |
+| `Documento` | Número | Copia del asociado, **no es FK** |
+| `Nombre`, `Apellido`, `Servicio` | Texto corto | Copias congeladas del asociado |
+| `CUIL`, `Digito` | **Texto corto** | ⚠️ Son Número en `Asociados` |
+| `Horas`, `ValorHora` | Número | |
+| `Basico`, `Mutual`, `Anticipo`, `Otros` | Número | Conceptos **separados** |
+| `Comentario`, `OtrosComentario` | Texto corto | Texto libre |
 
-Tabla separada, no texto libre: si se escribe a mano, en un año conviven "Limpieza", "limpieza" y "Limpiez" como tres servicios distintos y no se puede filtrar ni totalizar nada.
+### El bono no usa clave foránea, y está bien
 
-### Bonos
+El bono se copia adentro `Documento`, `Nombre`, `Apellido`, `Servicio`, `CUIL` y
+`Digito` de la persona. Parece redundancia; no lo es. Si el asociado cambia de
+servicio en 2027, el bono de 2019 sigue diciendo el servicio que tenía en 2019.
+**El bono congela quién era la persona**, no solo cuánto cobró, y por eso es
+autosuficiente para reimprimir.
+
+### `Fecha` no sirve para razonar sobre el período ⚠️
+
+Contradice al período en registros reales:
+
+| Id de pago | `Fecha` | Período |
+|---|---|---|
+| 31144 | 1/1/**2000** | ENERO **2020** |
+| 36361 | 10/1/**2018** | **DICIEMBRE** 2018 |
+| 36606 | 2/2/**2016** | ENERO **2018** |
+
+**El período es `PeriodoMes` + `PeriodoAño`, punto.** Filtrar o agrupar por
+`Fecha` produce números incorrectos que nadie detecta.
+
+### El mes es texto y no ordena ⚠️
+
+Ordenar `PeriodoMes` alfabéticamente da ABRIL, AGOSTO, DICIEMBRE, ENERO,
+FEBRERO… Hace falta traducir nombre de mes a número antes de ordenar o comparar.
+Esa función se escribe una sola vez y la usan bonos y anticipos.
+
+### Columnas que el borrador inventaba y no existen
+
+- **`Total`** — se calcula, no se guarda. Correcto: como todos los componentes
+  están congelados, el total se reconstruye siempre igual.
+- **`Anulado`** — no existe. La anulación se hace escribiendo texto libre en
+  `Comentario` (se observó `"BONO ERRONE…"`). **No es consultable de forma
+  confiable**: alguien puede escribir "ERRONEO", "ERROR", "ANULADO" o nada.
+- **`Impreso`** — no existe en `Bono`, aunque sí en `Asociados`.
+- **`Descuentos`** como campo único — son cuatro conceptos separados.
+
+---
+
+## 6. Tabla `Anticipos` ✅
 
 | Campo | Tipo Access | Notas |
 |---|---|---|
-| IdBono | Autonumérico | PK |
-| IdAsociado | Numérico | **FK obligatoria** → Asociados |
-| Periodo | Texto (7) | Formato AAAA-MM |
-| Horas | Numérico (Doble) | |
-| ValorHora | Moneda | **Congelado al momento de grabar** |
-| Descuentos | Moneda | *(estructura pendiente de definir)* |
-| Total | Moneda | Calculado y persistido |
-| FechaEmision | Fecha/Hora | |
-| Impreso | Sí/No | |
-| Anulado | Sí/No | |
+| `Documento` 🔑 | Número (entero largo) | PK, requerido, **indexado sin duplicados** |
+| `Anticipo` | Número | Monto pendiente |
+| `PeriodoMes` | Texto corto | ⏳ **A agregar** — misma convención que `Bono` |
+| `PeriodoAño` | Texto corto | ⏳ **A agregar** |
 
-### Anticipos
+**Es un saldo, no un historial.** Con `Documento` como clave sin duplicados,
+cada persona tiene **una sola fila**. No puede haber un anticipo de marzo y otro
+de abril conviviendo: el segundo pisa al primero.
+
+Eso modela correctamente el proceso real de la oficina: se graba el anticipo
+cuando el empleado lo cobra, y no se toca hasta que se emite el bono y se le
+paga.
+
+Todo lo que el borrador describía para esta tabla — `IdAnticipo`, `Fecha`,
+`Monto`, `Observaciones`, `Descontado`, `IdBono` — **no existe**.
+
+---
+
+## 7. Tabla `Servicio` ✅
 
 | Campo | Tipo Access | Notas |
 |---|---|---|
-| IdAnticipo | Autonumérico | PK |
-| IdAsociado | Numérico | **FK obligatoria** → Asociados |
-| Fecha | Fecha/Hora | |
-| Monto | Moneda | |
-| Observaciones | Texto (200) | |
-| Descontado | Sí/No | Si ya se aplicó a un bono |
-| IdBono | Numérico | FK opcional → Bonos *(pendiente de confirmar)* |
+| `Servicio` 🔑 | Texto corto (50) | Única columna. PK, requerido, sin duplicados |
 
-### Diagrama de relaciones
+**La columna se llama igual que la tabla.** No existe ninguna columna `Nombre`.
+
+Esta fue la causa del error *"No se han especificado valores para algunos de los
+parámetros requeridos"* que impedía editar asociados: la consulta pedía
+`SELECT Nombre FROM Servicio`, Access no reconocía el identificador y lo tomaba
+por un parámetro sin valor.
+
+## 8. Tabla `Cargo` 🔍
+
+**No relevada.** Se asume la misma convención que `Servicio` — una única columna
+llamada `Cargo`. Por eso el código conserva un repliegue: si la consulta falla,
+los valores salen de los que ya están en uso en `Asociados`.
+
+## 9. Tablas `Baja` y `Pasivos` ✅ — no se usan
+
+Ambas tienen **un solo registro** y están fuera de uso. No se relevó su
+estructura porque no hace falta: ningún módulo las va a tocar. No borrarlas
+igual — no cuestan nada y borrar en esta base es lo que dejó 885 bonos
+huérfanos la vez anterior.
+
+---
+
+## 10. Impresión del bono — informe de Access ✅
+
+El recibo se imprime desde un informe de Access. La ventana relevada se titula
+**`Sueldo`**, no `Bono` — hay informes con los dos nombres y falta confirmar
+cuál se usa para imprimir ❓.
+
+### Encabezado fijo del recibo
 
 ```
-Servicios (1) ──< (N) Asociados (1) ──< (N) Bonos
-                              │
-                              └────< (N) Anticipos
+              Cooperativa de Trabajo
+    "Sistema de Informaciones Generales" Ltda.
+         Rioja 443, Ciudad - Mendoza
+           C.U.I.T. 30-62630506-3
 ```
 
+### Campos y fórmulas leídos en vista Diseño
+
+| Etiqueta en el recibo | Origen |
+|---|---|
+| Apellido / Nombre | `[Apellido]`, `[Nombre]` |
+| CUIL | `[CUIL] - [Documento] - [Digito]` |
+| Servicio | `[Servicio]` |
+| Período | `[PeriodoMes]` `[PeriodoAño]` |
+| Horas × ValorHora | `=[ValorHora]*[Hor…]` |
+| **Ley 20337 (2%)** | **`=[Haberes]*0,02`** |
+| Seguro | `[Mutual]` |
+| Anticipo | `[Anticipo]` |
+| Otros / OtrosComentario | `[Otros]`, `[OtrosComentario]` |
+| Total Excedentes Repartibles | `=[Basico]+[Total H…]` |
+| Total Descuentos | `=[Anticipo]+[Mutu…]` |
+| Neto a Cobrar | `=[Haberes]-[Desc…]` |
+| Recibí la cantidad de Pesos | `=Enletras([Neto])` |
+
+El pie tiene **líneas de firma** con la leyenda `Asociado:`. No es un listado:
+es el recibo que la persona firma.
+
+### Dos hallazgos que cambian el diseño
+
+**1. Existe un descuento del 2% (Ley 20337) que no está en la tabla.** Se
+calcula al imprimir sobre `[Haberes]` y no hay ninguna columna en `Bono` que lo
+guarde. La fórmula de `plan.md` no lo contempla. ⚠️ Ver R1.
+
+**2. `Enletras()` es una función VBA que vive dentro de la base.** Convierte el
+importe a letras para el recibo. Confirma que la base tiene código VBA propio —
+figuraba como incógnita desde el relevamiento original. Al portar la impresión a
+C# hay que reescribirla.
+
+### Nota sobre el vocabulario
+
+En una cooperativa no se paga "sueldo": se reparten **excedentes repartibles**.
+El recibo usa esa terminología y la interfaz debería respetarla.
+
 ---
 
-## 6. Reglas de negocio
+## 11. Reglas de negocio
 
-**R1 — Todo bono pertenece a un asociado.** Un asociado puede tener muchos bonos; un bono pertenece a exactamente uno. No puede existir un bono huérfano. Se garantiza con FK obligatoria más integridad referencial declarada en Access.
+### R1 — Fórmula del bono ⚠️ incompleta
 
-**R2 — Los anticipos siguen la misma regla.** Todo anticipo pertenece a exactamente un asociado.
-
-**R3 — Baja lógica, nunca borrado físico.** Dar de baja a un asociado marca `Activo = No` y carga `FechaBaja`. Nunca se elimina la fila: los bonos históricos dejarían de tener a quién apuntar y se rompe todo el archivo anterior. El "eliminar asociado" del menú ejecuta una baja lógica.
-
-**R4 — El bono congela sus propios valores.** `ValorHora`, `Horas`, `Descuentos` y `Total` se guardan en la fila del bono al momento de grabarlo. Si el valor hora cambia en junio, un bono de marzo reimpreso tiene que seguir mostrando el valor de marzo.
-
-**R5 — El DNI es único entre asociados.** Al cargar un alta, validar que no exista otro asociado con ese DNI (activo o inactivo) y avisar antes de guardar.
-
-**R6 — Un asociado inactivo no puede recibir bonos nuevos.** Aparece en consultas e históricos, pero no en el selector de carga de bonos.
-
-**R7 — Los bonos no se borran, se anulan.** Marcar `Anulado = Sí` en lugar de eliminar la fila.
-
----
-
-## 7. Pantallas
-
-### Menú principal
-
-Cuatro botones grandes:
-
-1. **Bonos**
-2. **Anticipos**
-3. **Asociados**
-4. *(cuarta opción pendiente de definir — probablemente reportes/impresión)*
-
-### Patrón común de pantalla de entidad
-
-Una sola pantalla por entidad en lugar de opciones separadas para consultar / editar / agregar:
+Lo verificado contra los registros históricos reales:
 
 ```
-┌──────────────────────────────────────────────┐
-│  [ buscador ..................... ]          │
-│  ( ) Solo activos   ( ) Todos                │
-├──────────────────────────────────────────────┤
-│  Apellido │ Nombre │ DNI │ Servicio │ Estado │
-│  ...........................................  │
-│  ...........................................  │
-├──────────────────────────────────────────────┤
-│  [ Nuevo ]  [ Editar ]  [ Ver ]  [ Baja ]    │
-└──────────────────────────────────────────────┘
+Total = (Horas × ValorHora) + Basico − Mutual − Anticipo − Otros
 ```
 
-### Buscador inteligente (crítico)
+**Esta fórmula está incompleta.** El informe de impresión aplica además un
+descuento de **Ley 20337 (2%) sobre los haberes**, que no está guardado en
+ninguna columna de `Bono`. Falta confirmar si ese 2% entra en "Total Descuentos"
+y por lo tanto reduce el neto ❓.
 
-Un único campo de texto:
+Construir el módulo con la fórmula de arriba produciría totales **2% por encima**
+de lo que la cooperativa paga hoy. Es un error silencioso y en plata.
 
-- Si el contenido es **todo numérico** → busca por DNI (coincidencia por prefijo).
-- Si contiene **letras** → busca por apellido y nombre.
-- Filtra **mientras se tipea**, sin botón "Buscar".
-- El foco arranca siempre acá al abrir la pantalla.
+Tres hallazgos que salieron de mirar los datos, no de suponer:
 
-### Carga de bono — flujo objetivo
+- **Todo se guarda en positivo.** Los signos los pone la fórmula, no los datos.
+  No hay un solo valor negativo en la base.
+- **`Basico` se suma, no reemplaza.** En el 53% de los bonos convive con
+  horas × valor hora; en el 43% solo hay horas; en el 2% solo básico.
+- **`Mutual` no es fijo.** Fue 120 entre 2016 y 2021, pasó a 250 en 2022, y
+  también aparecen 0, 500, 700 y 3000.
 
-1. Tipear DNI en el buscador → Enter (el asociado queda seleccionado y sus datos se muestran arriba).
-2. Cargar horas, valor hora y descuentos, avanzando con Enter.
-3. Grabar e imprimir.
+Ese último punto manda sobre todo el diseño: **un bono de 2019 reimpreso hoy
+tiene que descontar 120, no 250.**
 
-Meta: cargar un bono sin tocar el mouse.
+### R2 — Valores congelados ✅
+
+Cada bono guarda sus propios importes y sus propias copias de los datos del
+asociado. **Jamás se leen de una tabla de referencia al reimprimir.**
+
+### R3 — Baja lógica, nunca borrado
+
+Dar de baja escribe `FechaBaja`. Nunca se elimina una fila. El sistema viejo
+borraba, y dejó 885 bonos huérfanos.
+
+### R4 — Anulación de bonos ⚠️ no implementable hoy
+
+La regla "los bonos no se borran, se anulan" **no se puede cumplir de forma
+consultable**: no existe columna `Anulado` y hoy se hace por texto libre en
+`Comentario`. Pendiente de decisión.
+
+### R5 — Descuento del anticipo en el bono ✅ decidido
+
+Flujo acordado:
+
+1. Se graba el anticipo cuando el empleado lo cobra, con su mes y año.
+2. Al cargar un bono, se busca en `Anticipos` por `Documento` + `PeriodoMes` +
+   `PeriodoAño`. Si hay coincidencia, el monto se **copia** al campo `Anticipo`
+   del bono y el total lo resta.
+3. **Al grabar el bono, la fila de `Anticipos` se pone en cero.** El anticipo
+   dejó de estar pendiente: ya vive congelado dentro del bono.
+
+Poner la fila en cero resuelve tres cosas: un segundo bono del mismo período no
+encuentra nada que descontar, la pregunta "¿ya se lo descontamos?" se responde
+mirando la tabla, y la fila queda libre para el próximo anticipo.
+
+**Si se intenta cargar un anticipo a alguien que ya tiene uno pendiente**, el
+sistema avisa e invita a modificar el existente. No se ofrece un botón de
+"reemplazar": si alguien pide más plata en el mismo mes, lo correcto es que el
+pendiente suba, y un reemplazo de un clic convierte un error en plata regalada.
+
+### R6 — El cruce nunca va por `Fecha`
+
+Ni para anticipos ni para bonos. Solo `PeriodoMes` + `PeriodoAño`.
 
 ---
 
-## 8. Impresión de bonos
+## 12. Estrategia de datos
 
-**Sección pendiente de relevamiento.**
-
-Requisito conocido: los datos del bono se sobreimprimen sobre una plantilla preexistente y sale el bono completo.
-
-A definir tras revisar el programa actual:
-
-- ¿La plantilla es papel preimpreso o una imagen/PDF que se imprime junto con los datos?
-- Medidas exactas del formulario y coordenadas de cada campo.
-- Tamaño de papel y orientación.
-- ¿Se imprime de a uno o por lote (todos los bonos del período)?
-- ¿Hay copias (original/duplicado)?
-
----
-
-## 9. Criterios de usabilidad
-
-- Botones y tipografía grandes; nada de iconos sin texto.
-- **Enter avanza al campo siguiente** en todos los formularios de carga.
-- Doble clic en una fila de grilla abre la edición directamente.
-- Confirmación explícita solo en acciones destructivas (baja, anulación).
-- Mensajes de error en castellano llano, sin códigos técnicos.
-- La aplicación abre directamente en el menú principal, sin login *(a confirmar — ver blancos)*.
-
----
-
-## 10. Fuera de alcance (versión 1)
-
-- Usuarios y permisos.
-- Reportes estadísticos o exportación a Excel.
-- Cálculo automático de aportes o cargas sociales.
-- Migración de la base a otro motor.
-
----
-
-## 11. Blancos pendientes
-
-| # | Pendiente | Cómo se resuelve |
+| Entidad | Estrategia | Motivo |
 |---|---|---|
-| 1 | Esquema real de la base Access actual (nombres de tablas y campos) | Abrir la base y documentar tablas, campos y tipos |
-| 2 | Formato del archivo: `.mdb` o `.accdb` | Mirar la extensión del archivo |
-| 3 | ¿La base tiene macros o módulos VBA con lógica? | Revisar en Access; si los hay, esa lógica hay que replicarla |
-| 4 | Cuarta opción del menú principal | Revisar el programa actual |
-| 5 | ¿Se guarda CUIL, CUIT o ambos? | Cambia la validación del dígito verificador |
-| 6 | Estructura de los descuentos del bono: ¿monto único o conceptos separados? | Revisar un bono real |
-| 7 | Detalle completo de campos del bono | Revisar la pantalla de carga actual |
-| 8 | Todo lo de la sección 8 (impresión) | Revisar el programa actual e imprimir un bono de muestra |
-| 9 | ¿Los anticipos se descuentan automáticamente del bono del período? | Preguntar cómo se hace hoy |
-| 10 | ¿Hace falta login por usuario? | Preguntar |
-| 11 | Cantidad de backups a conservar | Definir (sugerencia: últimos 30) |
-| 12 | Arquitectura del Office instalado (32 o 64 bits) | En Access: Archivo → Cuenta → Acerca de |
+| `Asociados` | Padrón completo en memoria, filtrado en cliente | ~4.202 filas. Más rápido y simple que consultar por tecla. |
+| `Bono` | **Consulta filtrada por documento** | ~31.007 filas. **No traer el histórico entero.** |
+| `Anticipos` | Consulta puntual por documento | Una fila por persona. |
+
+---
+
+## 13. Pendientes
+
+| # | Pendiente | Cómo se resuelve | Bloquea |
+|---|---|---|---|
+| 1 | **Si el 2% de Ley 20337 se resta del neto** | Vista Preliminar del informe con un bono real, y comparar contra los valores guardados | **Todo cálculo de bonos** |
+| 2 | Fórmulas del informe cortadas a la derecha | Foto de la vista Diseño con la columna de cálculo completa | La impresión |
+| 3 | Si se imprime desde el informe `Sueldo` o desde `Bono` | Preguntar en la oficina / abrir los dos | La impresión |
+| 4 | Código de la función VBA `Enletras()` | Access → Alt+F11 → módulos | La impresión |
+| 5 | Agregar `PeriodoMes` y `PeriodoAño` a `Anticipos` | Vista Diseño → dos filas nuevas | El módulo de anticipos |
+| 6 | Estructura de `Cargo` | Vista Diseño | Nada (hay repliegue) |
+| 7 | Medidas del papel y si es preimpreso | Configurar página del informe | La impresión |
+| 8 | Qué hacer si el anticipo supera al bono | Decisión de negocio | Nada por ahora |
+| 9 | Cómo anular bonos de forma consultable | Decisión de negocio | R4 |
+| 10 | Discrepancia de conteo: 31.007 vs 33.578 en `plan.md` | Puede ser la base de la otra oficina | Nada |
+
+---
+
+## 14. Estado del sistema
+
+**Módulo de Asociados: terminado y en uso.** Búsqueda por documento o apellido
+con filtrado mientras se tipea, filtro por servicio, alta y edición con los
+campos completos, campo único que acepta CUIT o DNI, baja lógica y
+reactivación, y respaldo automático al arrancar.
+
+**Módulo de Bonos: no iniciado.** Bloqueado por el pendiente #1 — no se puede
+calcular un total sin saber si el 2% de Ley 20337 lo reduce.
+
+**Módulo de Anticipos: no iniciado.** Bloqueado por el pendiente #5.
