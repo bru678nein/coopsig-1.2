@@ -373,11 +373,16 @@ Además del *Origen del control*, los propios datos lo confirman. Bonos de
 | `Basico` | menos 2% | Resultado |
 |---:|---:|---|
 | $612.244,90 | $12.244,90 | **$600.000,00** exacto |
-| $586.734,70 | $11.734,69 | **$575.000,00** exacto |
+| $586.734,70 | $11.734,69 | **$575.000,01** — un centavo por redondeo |
 
 Esos básicos se fijaron trabajando hacia atrás desde un neto redondo
-(`600.000 ÷ 0,98 = 612.244,90`). Si el 2% no se aplicara al básico, no habría
-motivo para elegir un número así en lugar de $600.000 directo.
+(`600.000 ÷ 0,98 = 612.244,90`; `575.000 ÷ 0,98 = 586.734,69…`). Si el 2% no se
+aplicara al básico, no habría motivo para elegir números así en lugar de
+$600.000 y $575.000 directos.
+
+El centavo del segundo caso no es un error del cálculo: es lo que pasa cuando se
+redondea el básico a dos decimales y después se le vuelve a sacar el 2%. El
+sistema actual arrastra la misma diferencia.
 
 La fila con básico $600.000,00 exacto corresponde a un `PREMIO`: ese se fijó en
 bruto, no en neto. Lógica distinta y consistente.
