@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Printing;
 using System.Globalization;
+using CoopSig.Config;
 using CoopSig.Models;
 using CoopSig.Utils;
 
@@ -93,6 +94,12 @@ namespace CoopSig.Impresion
 
         private int DibujarMembrete(Graphics lienzo, Rectangle area, int y)
         {
+            // El escudo va a la izquierda y el texto centrado en toda la hoja,
+            // como en el recibo original. No se reserva espacio para el escudo:
+            // el texto centrado nunca llega tan a la izquierda, y si el archivo
+            // no está el membrete queda igual de derecho.
+            DibujarEscudo(lienzo, area.Left, y);
+
             y = DibujarCentrado(lienzo, Encabezado, _fuenteTitulo, area, y);
             y = DibujarCentrado(lienzo, RazonSocial, _fuenteRazonSocial, area, y);
             y = DibujarCentrado(lienzo, Domicilio, _fuenteChica, area, y);
@@ -216,6 +223,42 @@ namespace CoopSig.Impresion
             lienzo.DrawString(texto, _fuenteNormal, Brushes.Black, rectangulo);
         }
 
+        /// <summary>
+        /// Escudo de la cooperativa, arriba a la izquierda del membrete. Si el
+        /// archivo no está, el recibo sale sin él: es identidad visual, no un
+        /// dato del bono, y no puede impedir que se emita.
+        /// </summary>
+        private static void DibujarEscudo(Graphics lienzo, int x, int y)
+        {
+            var ruta = AppSettings.RutaDeImagen("coopsig");
+            if (ruta == null)
+            {
+                return;
+            }
+
+            try
+            {
+                using (var original = Image.FromFile(ruta))
+                {
+                    const int LadoMaximo = 70;
+
+                    var escala = Math.Min(
+                        (float)LadoMaximo / original.Width,
+                        (float)LadoMaximo / original.Height);
+                    escala = Math.Min(escala, 1f);
+
+                    lienzo.DrawImage(
+                        original, x, y,
+                        (int)(original.Width * escala),
+                        (int)(original.Height * escala));
+                }
+            }
+            catch (Exception)
+            {
+                // Un escudo ilegible no puede impedir que se emita el recibo.
+            }
+        }
+
         private void DibujarFirmas(Graphics lienzo, Rectangle area)
         {
             // Las firmas van ancladas al pie del área imprimible, no debajo del
@@ -224,10 +267,21 @@ namespace CoopSig.Impresion
             var y = area.Bottom - 70;
             var ancho = area.Width / 4;
 
+            // Las firmas de las autoridades salen impresas en el recibo, igual
+            // que en el informe de Access, que las tiene escaneadas adentro.
+            // El único que firma a mano es el asociado cuando cobra.
             var titulos = new[] { "Presidente", "Secretario", "Tesorero", "Asociado" };
+            var archivos = new[] { "presidente", "secretario", "tesorero", null };
+
             for (var i = 0; i < titulos.Length; i++)
             {
                 var izquierda = area.Left + i * ancho;
+
+                if (archivos[i] != null)
+                {
+                    DibujarFirmaEscaneada(lienzo, archivos[i], izquierda + 10, y, ancho - 20);
+                }
+
                 lienzo.DrawLine(Pens.Black, izquierda + 10, y, izquierda + ancho - 10, y);
 
                 var formato = new StringFormat { Alignment = StringAlignment.Center };
@@ -240,6 +294,55 @@ namespace CoopSig.Impresion
                 "(Aclaración y N° Documento)", _fuenteChica, Brushes.Gray,
                 new RectangleF(area.Left + 3 * ancho, y + 20, ancho, 18),
                 new StringFormat { Alignment = StringAlignment.Center });
+        }
+
+        /// <summary>
+        /// Dibuja la firma escaneada justo encima de su línea, centrada y
+        /// escalada para entrar en el espacio disponible.
+        ///
+        /// Si el archivo no está, no pasa nada: sale la línea vacía y se firma
+        /// a mano. Un recibo sin la firma impresa sirve igual; uno que no se
+        /// puede emitir porque falta un PNG, no.
+        ///
+        /// Van como archivos sueltos y no embebidos en el programa a propósito:
+        /// las autoridades de una cooperativa cambian, y reemplazar un PNG
+        /// tiene que poder hacerlo la oficina sin recompilar nada.
+        /// </summary>
+        private static void DibujarFirmaEscaneada(
+            Graphics lienzo, string nombre, int x, int yLinea, int anchoDisponible)
+        {
+            var ruta = AppSettings.RutaDeImagen(nombre);
+            if (ruta == null)
+            {
+                return;
+            }
+
+            try
+            {
+                using (var original = Image.FromFile(ruta))
+                {
+                    const int AltoMaximo = 46;
+
+                    var escala = Math.Min(
+                        (float)anchoDisponible / original.Width,
+                        (float)AltoMaximo / original.Height);
+                    escala = Math.Min(escala, 1f);
+
+                    var ancho = (int)(original.Width * escala);
+                    var alto = (int)(original.Height * escala);
+
+                    lienzo.DrawImage(
+                        original,
+                        x + (anchoDisponible - ancho) / 2,
+                        yLinea - alto - 2,
+                        ancho, alto);
+                }
+            }
+            catch (Exception)
+            {
+                // Una imagen ilegible o corrupta no puede impedir que se emita
+                // el recibo. Queda la línea para firmar a mano.
+            }
         }
 
         private string CuilCompleto()

@@ -23,6 +23,17 @@ packages/
 *.accdb
 *.laccdb
 
+# Firmas escaneadas de las autoridades. NUNCA deben entrar al repositorio:
+# una firma escaneada no es un dato personal cualquiera, es el instrumento
+# para firmar documentos en nombre de esa persona. Con ese archivo se puede
+# estampar la firma del presidente en cualquier cosa. Y el historial de git
+# no se borra: subirla una vez es subirla para siempre.
+# Van en una carpeta local en cada máquina, fuera del control de versiones.
+Firmas/
+firma*.png
+firma*.jpg
+firma*.bmp
+
 # Copias de seguridad generadas por la aplicación
 Backups/
 

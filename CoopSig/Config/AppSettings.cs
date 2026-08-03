@@ -41,6 +41,34 @@ namespace CoopSig.Config
             }
         }
 
+        /// <summary>
+        /// Ruta de una imagen del recibo -el escudo de la cooperativa o una
+        /// firma escaneada-, o null si no está. Se prueban los formatos
+        /// habituales para que la oficina pueda dejar el archivo como lo tenga,
+        /// sin convertirlo.
+        ///
+        /// La búsqueda no distingue mayúsculas porque Windows tampoco: da igual
+        /// que el archivo se llame CoopSig.png o coopsig.png.
+        /// </summary>
+        public static string RutaDeImagen(string nombre)
+        {
+            var carpeta = ConfigurationManager.AppSettings["CarpetaFirmas"];
+            if (string.IsNullOrWhiteSpace(carpeta))
+            {
+                carpeta = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Firmas");
+            }
+
+            foreach (var extension in new[] { ".png", ".jpg", ".jpeg", ".bmp" })
+            {
+                var ruta = Path.Combine(carpeta, nombre + extension);
+                if (File.Exists(ruta))
+                {
+                    return ruta;
+                }
+            }
+            return null;
+        }
+
         public static int CantidadBackupsAConservar
         {
             get
